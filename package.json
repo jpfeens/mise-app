@@ -1,0 +1,20 @@
+{
+  "name": "mise-app",
+  "version": "0.1.0",
+  "description": "Mise — AI-powered recipe library",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start":   "node server.js",
+    "dev":     "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.44.0",
+    "dotenv":                "^16.4.5",
+    "express":               "^4.19.2",
+    "node-fetch":            "^3.3.2"
+  }
+}
