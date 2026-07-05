@@ -1,12 +1,12 @@
 {
   "name": "mise-app",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mise — AI-powered recipe library",
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start":   "node server.js",
-    "dev":     "node --watch server.js"
+    "start": "node server.js",
+    "dev":   "node --watch server.js"
   },
   "engines": {
     "node": ">=18.0.0"

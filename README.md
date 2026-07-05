@@ -1,147 +1,100 @@
 # 🍴 Mise
 
-> AI-powered recipe library — import from photos, screenshots, or URLs. Discover recipes by mood or pantry. Plan your week. Generate grocery lists.
+> AI-powered recipe library — import from photos, screenshots, or URLs. Discover real recipes. Plan your week. Generate grocery lists.
 
 ---
 
-## Stack
+## What's in this repo
 
-| Layer | Technology |
+| File | Purpose |
 |---|---|
-| Frontend | Vanilla HTML/CSS/JS (single file) |
-| Backend | Node.js + Express |
-| AI | Anthropic Claude (`claude-sonnet-4-6`) |
-| Database | Supabase (Postgres) |
+| `server.js` | Express server — Claude API proxy + all CRUD routes |
+| `public/index.html` | The full frontend (paste the latest widget here) |
+| `public/api.js` | Client module for calling server routes |
+| `supabase/schema.sql` | Run once in Supabase SQL Editor to create tables |
+| `package.json` | Node dependencies |
+| `.env.example` | Copy to `.env` and fill in your keys |
 
 ---
 
-## Local setup (5 minutes)
+## Quick start
 
-### 1 — Clone
+### 1 — Install
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/mise-app.git
 cd mise-app
 npm install
+cp .env.example .env   # then fill in your three keys
 ```
 
-### 2 — Environment variables
+### 2 — Set up the database
 
-```bash
-cp .env.example .env
-```
+1. Create a free project at [supabase.com](https://supabase.com)
+2. Go to **SQL Editor → New query**
+3. Paste the contents of `supabase/schema.sql` and click **Run**
 
-Open `.env` and fill in:
+### 3 — Add the frontend
 
-| Variable | Where to get it |
-|---|---|
-| `ANTHROPIC_API_KEY` | [console.anthropic.com/account/keys](https://console.anthropic.com/account/keys) |
-| `SUPABASE_URL` | Supabase Dashboard → Project Settings → API → Project URL |
-| `SUPABASE_ANON_KEY` | Supabase Dashboard → Project Settings → API → anon public key |
-
-### 3 — Create the database
-
-1. Go to [supabase.com](https://supabase.com), create a free project
-2. Open **SQL Editor → New query**
-3. Paste the entire contents of `supabase/schema.sql`
-4. Click **Run**
-
-This creates four tables (`recipes`, `profiles`, `grocery_items`, `planner_slots`) and seeds three starter recipes.
-
-### 4 — Add your frontend
-
-Copy (or move) your `index.html` into the `public/` folder:
-
-```bash
-cp ~/Downloads/mise_v4_full.html public/index.html
-```
-
-Then do a single find-and-replace inside `index.html`:
+Save the latest widget from the Claude conversation as `public/index.html`, then do one find-and-replace:
 
 - **Find:** `https://api.anthropic.com/v1/messages`
 - **Replace:** `/api/claude`
 
-That's the only change needed — all AI calls now route through the server proxy.
-
-### 5 — Run
+### 4 — Run
 
 ```bash
-npm run dev      # auto-restarts on file changes (Node 18+)
-# or
-npm start        # production
+npm run dev    # auto-restarts on changes (Node 18+)
+# open http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) 🎉
+### 5 — Deploy to Railway
 
----
-
-## Connecting the frontend to persistence
-
-`public/api.js` is a thin client module you can import in `index.html` to load/save recipes from Supabase instead of keeping them in memory. Add this to the top of your `<script>` block:
-
-```html
-<script type="module">
-import { recipes, grocery, planner, claude, extractText } from '/api.js';
-
-// Load recipes on startup instead of using the hardcoded RECIPES array:
-const data = await recipes.list();
-// data is an array of recipe objects from Supabase
-
-// Save a new recipe:
-await recipes.create({ name: 'My recipe', cat: 'dinner', ... });
-
-// Update a recipe (e.g. after changing rating):
-await recipes.update(id, { rating: 5 });
-
-// Claude calls go through the proxy automatically:
-const response = await claude({ messages: [...] });
-const text = extractText(response);
-</script>
-```
-
-See `public/api.js` for the full API surface.
-
----
-
-## Deploying to Railway (free beta hosting)
-
-1. Push your code to GitHub
+1. Push to GitHub
 2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub
-3. Select your repo
-4. In **Variables**, add all three env vars from your `.env`
-5. Railway auto-detects Node and runs `npm start`
-
-Your app gets a public URL (`https://mise-app-production.up.railway.app`) in about 2 minutes.
+3. Add three environment variables: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`
+4. Railway auto-deploys — live URL in ~60 seconds
 
 ---
 
-## Project structure
+## Wiring up persistence
 
+The frontend currently uses an in-memory recipe array. To make recipes survive page refreshes, add this to the top of your `<script>` block in `index.html`:
+
+```js
+// Load recipes from Supabase on startup
+async function loadRecipesFromDB() {
+  try {
+    const data = await fetch('/api/recipes').then(r => r.json());
+    if (data && data.length) {
+      recipes = data.map(r => ({
+        ...r,
+        ings: r.ings || [], steps: r.steps || [],
+        tags: r.tags || [], profiles: r.profiles || [], edits: r.edits || [],
+      }));
+      filterRecipes();
+    }
+  } catch(e) { console.error('Could not load recipes:', e); }
+}
+loadRecipesFromDB();
 ```
-mise-app/
-├── server.js           ← Express server + API routes
-├── public/
-│   ├── index.html      ← The full frontend (copy yours here)
-│   └── api.js          ← Client module for server routes
-├── supabase/
-│   └── schema.sql      ← Run once in Supabase SQL editor
-├── package.json
-├── .env.example        ← Copy to .env and fill in
-└── .gitignore
-```
+
+Then update `saveExtracted()` to also POST to `/api/recipes`, and update `saveCbEdit()` to PATCH to `/api/recipes/:id`. See `public/api.js` for the full client API.
+
+---
 
 ## API routes
 
 | Method | Route | Description |
 |---|---|---|
-| `POST` | `/api/claude` | Proxies to Anthropic (keeps key server-side) |
+| `POST` | `/api/claude` | Proxies to Anthropic |
 | `GET` | `/api/recipes` | List all recipes |
 | `POST` | `/api/recipes` | Create a recipe |
 | `PATCH` | `/api/recipes/:id` | Update a recipe |
 | `DELETE` | `/api/recipes/:id` | Delete a recipe |
-| `GET` | `/api/profiles` | List family profiles |
+| `GET` | `/api/profiles` | List profiles |
 | `POST` | `/api/profiles` | Create a profile |
-| `GET` | `/api/grocery` | List grocery items |
+| `GET` | `/api/grocery` | Grocery list |
 | `POST` | `/api/grocery` | Add items (deduplicates) |
 | `PATCH` | `/api/grocery/:id` | Toggle checked |
 | `DELETE` | `/api/grocery/checked` | Clear checked items |
@@ -152,9 +105,26 @@ mise-app/
 
 ---
 
+## Features
+
+- **Multi-screenshot import** — queue multiple screenshots, Claude compiles them into one recipe
+- **Real food photos** — auto-fetched from Unsplash on import; replaceable with your own
+- **Discover mode** — Claude finds a real highly-rated recipe matching your mood and imports it fully
+- **Cookbook view** — full-screen recipe page with two-column layout
+- **Serving scaler** — scales all ingredient amounts; green highlights show what changed
+- **Selective grocery list** — tick which ingredients you need before adding to list
+- **Meal planner** — 7-day grid with searchable recipe picker per slot
+- **Wear marks** — heavily-used recipes show coffee rings and stains on their card
+- **Handwriting edits** — crossed-out originals with Caveat-font annotations
+- **"I made this"** — distinct cook-logging button separate from just viewing
+- **Responsive** — works on desktop, tablet, and mobile
+
+---
+
 ## Before going public
 
-- [ ] Add authentication (Supabase Auth is the easiest path — magic links or Google OAuth)
-- [ ] Tighten Row Level Security policies so users only see their own recipes
-- [ ] Add rate limiting to `/api/claude` (the `express-rate-limit` package)
-- [ ] Store images in Supabase Storage instead of as base64 strings
+- [ ] Add Supabase Auth (email magic links or Google OAuth)
+- [ ] Tighten Row Level Security so users only see their own data
+- [ ] Add rate limiting to `/api/claude` (`express-rate-limit` package)
+- [ ] Switch to Unsplash API (free, 50 req/hr) for proper photo attribution
+- [ ] Store uploaded photos in Supabase Storage instead of as base64 strings
