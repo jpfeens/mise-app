@@ -858,14 +858,37 @@ let discoverActiveProfiles=['all'];
 function toggleDiscoverProfile(el){
   const pid=el.dataset.pid;
   if(pid==='all'){
-    discoverActiveProfiles=['all'];
-    document.querySelectorAll('.dprofile-chip').forEach(c=>c.classList.toggle('active',c.dataset.pid==='all'));
+    // Toggle Everyone: if already sole selection, clicking again keeps it (no-op feels natural)
+    // but if profiles are selected, clicking Everyone clears them all
+    const hasProfiles=discoverActiveProfiles.some(p=>p!=='all');
+    if(hasProfiles){
+      discoverActiveProfiles=['all'];
+    } else {
+      // Already on Everyone — stay on Everyone (nothing to toggle to)
+      return;
+    }
   } else {
-    discoverActiveProfiles=discoverActiveProfiles.filter(p=>p!=='all');
-    el.classList.toggle('active');
-    discoverActiveProfiles=Array.from(document.querySelectorAll('.dprofile-chip.active')).map(c=>c.dataset.pid).filter(p=>p!=='all');
-    if(!discoverActiveProfiles.length){discoverActiveProfiles=['all'];document.querySelectorAll('.dprofile-chip').forEach(c=>c.classList.toggle('active',c.dataset.pid==='all'));}
+    // Toggle an individual profile
+    const idx=discoverActiveProfiles.indexOf(pid);
+    if(idx>=0){
+      // Deselect it
+      discoverActiveProfiles.splice(idx,1);
+      // If nothing left, fall back to Everyone
+      if(!discoverActiveProfiles.filter(p=>p!=='all').length){
+        discoverActiveProfiles=['all'];
+      }
+    } else {
+      // Select it, remove Everyone
+      discoverActiveProfiles=discoverActiveProfiles.filter(p=>p!=='all');
+      discoverActiveProfiles.push(pid);
+    }
   }
+  // Sync chip UI across all instances (panel + mobile sheet may both exist)
+  document.querySelectorAll('.dprofile-chip').forEach(c=>{
+    const cpid=c.dataset.pid;
+    const on=discoverActiveProfiles.includes(cpid)||(cpid==='all'&&discoverActiveProfiles.includes('all'));
+    c.classList.toggle('active',on);
+  });
 }
 
 function buildDiscoverProfileContext(){
@@ -911,8 +934,8 @@ async function saveDiscoveredRecipe(btn){
 }
 let importMode=null,screenshotQueue=[],pendingImageData=null,importCtx='';
 const EXTRACT_PROMPT=`Extract the recipe from the provided source(s) and return ONLY valid JSON (no markdown):
-{"name":"...","category":"breakfast|lunch|dinner|snack|dessert","emoji":"single emoji","time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"photoSearchQuery":"descriptive phrase for a food photo search","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
-If multiple images are provided, compile them into one complete recipe. Auto-generate 2-3 relevant tags. Return valid JSON only.`;
+{"name":"...","category":"breakfast|lunch|dinner|snack|dessert","emoji":"single emoji","time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"photoSearchQuery":"descriptive phrase for a food photo search","sourceLabel":"website name, URL, or logo text visible in the image — e.g. 'seriouseats.com' or 'Ottolenghi'. Leave empty string if none visible.","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
+If multiple images are provided, compile them into one complete recipe. Look for any visible website address, domain name, publication name, or brand logo and put it in sourceLabel. Auto-generate 2-3 relevant tags. Return valid JSON only.`;
 function setImportMode(mode,ctx){
   importMode=mode;importCtx=ctx||'';screenshotQueue=[];pendingImageData=null;
   const sfx=importCtx?'-'+importCtx:'';
@@ -941,25 +964,95 @@ async function parseUrl(){const url=document.getElementById('url-inp')?.value.tr
 async function parseText(){const text=document.getElementById('text-inp').value.trim();if(!text)return;showProcessing('Structuring recipe\u2026');await callExtract([{role:'user',content:`${EXTRACT_PROMPT}\n\nRecipe text:\n${text}`}]);}
 function showProcessing(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-input-area'+sfx).style.display='none';const ra=document.getElementById('import-result-area'+sfx);ra.style.display='flex';ra.innerHTML=`<div class="processing-card"><i class="ti ti-loader spinner"></i> ${msg}</div>`;}
 async function callExtract(messages){try{const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,messages})});const data=await res.json();handleExtractResult(data.content.map(b=>b.text||'').join(''));}catch(e){showImportError('Something went wrong. Check your connection.');}}
+// Holds the last extracted recipe so Preview and Save both work
+let pendingExtractedRecipe=null;
+
 async function handleExtractResult(text){
   try{
     const r=JSON.parse(text.replace(/```json|```/g,'').trim());
+    pendingExtractedRecipe=r;
     const photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name)+' food recipe')}`;
+    r._photoUrl=photoUrl; // stash for save
     const sfx=importCtx?'-'+importCtx:'';
     const ra=document.getElementById('import-result-area'+sfx);
-    ra.innerHTML=`<div class="section-lbl">Extracted &mdash; looks right?</div><div class="result-card"><div style="height:120px;overflow:hidden;border-radius:var(--r2) var(--r2) 0 0;background:var(--paper3)"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" alt="${r.name}" onerror="this.style.display='none'"></div><div class="rc-body2"><div style="font-family:'Lora',serif;font-size:13px;font-weight:500;margin-bottom:4px">${r.name}</div><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span><span style="font-size:11px;color:var(--ink4);margin-left:5px">${r.time} &middot; ${r.baseServings||2} servings</span><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:6px">${(r.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><div style="display:flex;gap:6px;margin-top:10px"><div class="btn-primary" style="flex:1;text-align:center;cursor:pointer" onclick='saveExtracted(${JSON.stringify({...r,photoUrl}).replace(/'/g,"&#39;")})'>Save to library</div><div class="btn-ghost" style="cursor:pointer" onclick="resetImport()">Discard</div></div></div></div>`;
+    const sourceHtml=r.sourceLabel?`<div style="font-size:11px;color:var(--ink4);font-style:italic;margin-top:4px">Source: ${r.sourceLabel}</div>`:'';
+    ra.innerHTML=`<div class="section-lbl">Extracted &mdash; looks right?</div>
+    <div class="result-card">
+      <div style="height:110px;overflow:hidden;border-radius:var(--r2) var(--r2) 0 0;background:var(--paper3)"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" alt="${r.name}" onerror="this.style.display='none'"></div>
+      <div class="rc-body2">
+        <div style="font-family:'Lora',serif;font-size:13px;font-weight:500;margin-bottom:3px">${r.name}</div>
+        <span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span>
+        <span style="font-size:11px;color:var(--ink4);margin-left:5px">${r.time} &middot; ${r.baseServings||2} servings</span>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px">${(r.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+        ${sourceHtml}
+        <div style="display:flex;gap:6px;margin-top:10px">
+          <button class="btn-ghost" style="flex:1;justify-content:center" onclick="previewExtractedRecipe()"><i class="ti ti-eye"></i> Preview</button>
+          <button class="btn-primary" style="flex:1;justify-content:center" onclick="saveExtracted(pendingExtractedRecipe)"><i class="ti ti-check"></i> Save</button>
+          <button class="btn-ghost" onclick="resetImport()">&times;</button>
+        </div>
+      </div>
+    </div>`;
   }catch(e){showImportError('Could not parse a recipe. Try a clearer image or paste the text.');}
+}
+
+// Opens a temporary cookbook overlay for a not-yet-saved recipe
+function previewExtractedRecipe(){
+  if(!pendingExtractedRecipe)return;
+  const r=pendingExtractedRecipe;
+  // Build a temporary recipe object in the shape openCookbook expects
+  const temp={
+    id:'__preview__', name:r.name, cat:r.category, emoji:r.emoji||'\u{1F37D}',
+    src:'screenshot', time:r.time, baseServings:r.baseServings||2,
+    timeMade:0, rating:0, notes:'', tags:r.tags||[], profiles:[], edits:[],
+    photoUrl:r._photoUrl||'', sourceLabel:r.sourceLabel||'',
+    ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),
+    steps:r.steps||[]
+  };
+  cbRecipe=temp;cbServings=temp.baseServings;cbTab='recipe';cbCheckedIngs=new Set();
+  // Render a preview-mode cookbook (no persist buttons, save/discard in topbar)
+  const ov=document.getElementById('cookbook-overlay');
+  ov.style.display='flex';
+  const photo=temp.photoUrl?`<img src="${temp.photoUrl}" alt="${temp.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<div class="cb-cover-placeholder" style="background:${catPlateColors[temp.cat]}">${temp.emoji}</div>`;
+  ov.innerHTML=`<div class="cookbook-topbar">
+    <div class="back-link" onclick="closePreviewCookbook()"><i class="ti ti-arrow-left"></i> Back to import</div>
+    <div style="font-size:11px;color:var(--ink4);font-style:italic;margin-left:8px">Preview — not saved yet</div>
+    <div class="cookbook-actions">
+      <button class="btn-ghost" onclick="closePreviewCookbook();resetImport()">Discard</button>
+      <button class="made-this-btn" style="background:var(--accent)" onclick="closePreviewCookbook();saveExtracted(pendingExtractedRecipe)"><i class="ti ti-check"></i> Save to library</button>
+    </div>
+  </div>
+  <div class="cookbook-scroll"><div class="cookbook-page">
+    <div class="cb-header">
+      <div class="cb-cover-photo">${photo}</div>
+      <div class="cb-title-block">
+        <div class="cb-title">${temp.name}</div>
+        <div class="cb-meta-row"><span class="cat-pill ${catPills[temp.cat]}">${temp.cat}</span><span class="cb-meta-item"><i class="ti ti-clock" style="font-size:13px"></i> ${temp.time}</span><span class="cb-meta-item">Serves ${temp.baseServings}</span></div>
+        <div class="cb-tags-row">${temp.tags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+        ${temp.sourceLabel?`<div style="font-size:11.5px;color:var(--ink4);font-style:italic;margin-top:8px">Source: ${temp.sourceLabel}</div>`:''}
+      </div>
+    </div>
+    <div id="cb-recipe-body"></div>
+  </div></div>`;
+  renderCbRecipeBody();
+}
+
+function closePreviewCookbook(){
+  const ov=document.getElementById('cookbook-overlay');
+  ov.style.display='none';
+  // Restore cbRecipe to null so normal cookbook flow isn't confused
+  cbRecipe=null;cbEditDraft=null;
 }
 function showImportError(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-result-area'+sfx).innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">${msg}</div><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Try again</button>`;}
 async function saveExtracted(r){
-  // Determine source info
-  let src='photo',sourceLabel='',sourceUrl='';
-  if(importMode==='url'){src='url';sourceUrl=r.sourceUrl||lastImportUrl||'';sourceLabel=sourceUrl;}
-  else if(importMode==='screenshots'){src='screenshot';sourceLabel='Imported from screenshots';}
-  else if(importMode==='photo'){src='photo';sourceLabel='Imported from a photo';}
-  else{src='manual';sourceLabel='Added manually';}
-  const newRecipe={id:Date.now(),name:r.name,cat:r.category,emoji:r.emoji||'\u{1F37D}',src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:r.photoUrl||'',sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
-  recipes.push(newRecipe);filterRecipes();resetImport();showToast('Recipe saved!');
+  // Determine source info — r.sourceLabel may come from Claude's screenshot analysis
+  let src='photo',sourceLabel=r.sourceLabel||'',sourceUrl='';
+  if(importMode==='url'){src='url';sourceUrl=r.sourceUrl||lastImportUrl||'';if(!sourceLabel)sourceLabel=sourceUrl;}
+  else if(importMode==='screenshots'){src='screenshot';if(!sourceLabel)sourceLabel='Imported from screenshots';}
+  else if(importMode==='photo'){src='photo';if(!sourceLabel)sourceLabel='Imported from a photo';}
+  else{src='manual';if(!sourceLabel)sourceLabel='Added manually';}
+  const photoUrl=r._photoUrl||r.photoUrl||`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name)+' food recipe')}`;
+  const newRecipe={id:Date.now(),name:r.name,cat:r.category,emoji:r.emoji||'\u{1F37D}',src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl,sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
+  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;showToast('Recipe saved!');
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
 function resetImport(){
