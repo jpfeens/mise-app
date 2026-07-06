@@ -23,6 +23,8 @@ create table if not exists recipes (
   ings          jsonb       default '[]',
   steps         jsonb       default '[]',
   photo_url     text        default '',   -- real food photo URL
+  source_label  text        default '',   -- human-readable source credit
+  source_url    text        default '',   -- original URL if imported from web
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 );

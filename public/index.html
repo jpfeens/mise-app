@@ -263,12 +263,36 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
 .emoji-custom-row input{flex:1;padding:6px 9px;border:1px solid var(--paper3);border-radius:var(--r);font-size:16px;text-align:center;font-family:'Inter',sans-serif}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{animation:spin 1s linear infinite;display:inline-block}
+/* source credit line in cookbook */
+.cb-source-credit{font-size:11.5px;color:var(--ink4);font-style:italic;margin-top:28px;padding-top:16px;border-top:1px solid var(--rule)}
+.cb-source-credit a{color:var(--ink4);text-decoration:underline}
+
+/* discover profile chips */
+.discover-profile-row{display:flex;gap:6px;flex-wrap:wrap;padding:10px 13px;border-bottom:1px solid var(--rule);flex-shrink:0}
+.dprofile-chip{display:flex;align-items:center;gap:5px;padding:5px 10px;border:1px solid var(--paper3);border-radius:99px;cursor:pointer;font-size:11px;color:var(--ink3);background:var(--paper);user-select:none}
+.dprofile-chip:hover{border-color:var(--ink4);color:var(--ink)}
+.dprofile-chip.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+/* mobile full-screen sheet (replaces panel on mobile) */
+.mobile-sheet-overlay{position:fixed;inset:0;background:rgba(26,24,20,.45);z-index:40;display:flex;flex-direction:column;justify-content:flex-end}
+.mobile-sheet{background:var(--paper);border-radius:var(--r3) var(--r3) 0 0;max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.mobile-sheet-handle{width:36px;height:4px;border-radius:99px;background:var(--paper4);margin:10px auto 4px;flex-shrink:0}
+.mobile-sheet-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 8px;flex-shrink:0}
+.mobile-sheet-title{font-family:'Lora',serif;font-size:16px;font-weight:500}
+.mobile-sheet-close{width:28px;height:28px;border-radius:50%;background:var(--paper2);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--ink3)}
+.mobile-sheet-body{flex:1;overflow-y:auto;padding:4px 16px 32px}
+
+/* sidebar close button (mobile) */
+.sidebar-close-btn{display:none;position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.12);border:none;cursor:pointer;align-items:center;justify-content:center;font-size:15px;color:rgba(255,255,255,.7)}
+.sidebar-close-btn:hover{background:rgba(255,255,255,.2);color:#fff}
+
 @media(max-width:900px){:root{--panel-w:240px}}
 @media(max-width:700px){
-  .sidebar{position:absolute;left:0;top:0;bottom:0;z-index:10;transform:translateX(-100%)}
+  .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:50;transform:translateX(-100%);box-shadow:4px 0 24px rgba(0,0,0,.25)}
   .sidebar.open{transform:translateX(0)}
-  .panel{position:absolute;right:0;top:0;bottom:0;z-index:10;transform:translateX(100%)}
-  .panel.open{transform:translateX(0)}
+  .sidebar-close-btn{display:flex}
+  /* panel hidden entirely on mobile — replaced by mobile-sheet */
+  .panel{display:none!important}
   .menu-btn{display:flex}
   .sw input{width:120px}
   .rg{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
@@ -285,6 +309,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
 <body>
 <div class="app" id="app">
   <div class="sidebar" id="sidebar">
+    <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Close menu"><i class="ti ti-x"></i></button>
     <div class="logo"><h1>Mise.</h1><p>Recipe library</p></div>
     <div class="nav-sec">
       <div class="nl">Library</div>
@@ -296,12 +321,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <div class="ni" onclick="setView('dessert',this)"><i class="ti ti-ice-cream"></i> Desserts <span class="nc" id="cnt-dessert">2</span></div>
     </div>
     <div class="nav-sec" style="margin-top:auto;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">
-      <div class="ni" onclick="openImport()"><i class="ti ti-plus"></i> Add recipe</div>
-      <div class="ni" onclick="showPanelTab('planner')"><i class="ti ti-calendar-week"></i> Meal planner</div>
-      <div class="ni" onclick="showPanelTab('grocery')"><i class="ti ti-shopping-cart"></i> Grocery</div>
-      <div class="ni" onclick="showPanelTab('pantry')"><i class="ti ti-fridge"></i> Pantry scan</div>
-      <div class="ni" onclick="showPanelTab('discover')"><i class="ti ti-sparkles"></i> Discover</div>
-      <div class="ni" onclick="showPanelTab('profile')"><i class="ti ti-users"></i> Profiles</div>
+      <div class="ni" onclick="navTo('import')"><i class="ti ti-plus"></i> Add recipe</div>
+      <div class="ni" onclick="navTo('planner')"><i class="ti ti-calendar-week"></i> Meal planner</div>
+      <div class="ni" onclick="navTo('grocery')"><i class="ti ti-shopping-cart"></i> Grocery</div>
+      <div class="ni" onclick="navTo('pantry')"><i class="ti ti-fridge"></i> Pantry scan</div>
+      <div class="ni" onclick="navTo('discover')"><i class="ti ti-sparkles"></i> Discover</div>
+      <div class="ni" onclick="navTo('profile')"><i class="ti ti-users"></i> Profiles</div>
     </div>
   </div>
   <div class="main" onclick="closeSidebarsOnMobile(event)">
@@ -309,7 +334,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <button class="menu-btn" onclick="toggleSidebar(event)"><i class="ti ti-menu-2"></i></button>
       <span class="topbar-title" id="page-title">All recipes</span>
       <div class="sw"><i class="ti ti-search"></i><input type="text" placeholder="Search…" oninput="filterRecipes(this.value)" id="search-inp"></div>
-      <button class="topbtn" onclick="openImport()"><i class="ti ti-plus"></i> Add</button>
+      <button class="topbtn" onclick="navTo('import')"><i class="ti ti-plus"></i> Add</button>
       <button class="menu-btn" onclick="togglePanel(event)" style="margin-left:4px"><i class="ti ti-layout-sidebar-right"></i></button>
     </div>
     <div class="content">
@@ -388,6 +413,13 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <div id="pantry-results" style="display:none;flex-direction:column;gap:8px"></div>
     </div>
     <div id="panel-discover" style="display:none;flex:1;overflow:hidden;flex-direction:column" class="chat-wrap">
+      <div class="discover-profile-row" id="discover-profile-row">
+        <span style="font-size:10px;color:var(--ink4);align-self:center;white-space:nowrap">For:</span>
+        <div class="dprofile-chip active" data-pid="all" onclick="toggleDiscoverProfile(this)">&#x1F46A; Everyone</div>
+        <div class="dprofile-chip" data-pid="maya" onclick="toggleDiscoverProfile(this)">&#x1F469; Maya</div>
+        <div class="dprofile-chip" data-pid="dad" onclick="toggleDiscoverProfile(this)">&#x1F468; Dad</div>
+        <div class="dprofile-chip" data-pid="luca" onclick="toggleDiscoverProfile(this)">&#x1F9D2; Luca</div>
+      </div>
       <div class="chat-area" id="discover-chat">
         <div class="msg ai" style="font-size:11px;line-height:1.6">Tell me what you&rsquo;re craving or what ingredients you want to use &mdash; I&rsquo;ll find a real, highly-rated recipe and import it for you to save or skip.</div>
         <div class="hint-chips">
@@ -451,6 +483,7 @@ function rowToRecipe(row){
     timeMade:row.time_made||0, rating:row.rating||0, notes:row.notes||'',
     tags:row.tags||[], profiles:row.profiles||[], edits:row.edits||[],
     photoUrl:row.photo_url||'',
+    sourceLabel:row.source_label||'', sourceUrl:row.source_url||'',
     ings:row.ings||[], steps:row.steps||[]
   };
 }
@@ -463,6 +496,7 @@ function recipeToRow(r){
     time_made:r.timeMade||0, rating:r.rating||0, notes:r.notes||'',
     tags:r.tags||[], profiles:r.profiles||[], edits:r.edits||[],
     photo_url:r.photoUrl||'',
+    source_label:r.sourceLabel||'', source_url:r.sourceUrl||'',
     ings:r.ings||[], steps:r.steps||[]
   };
 }
@@ -526,7 +560,7 @@ function renderGrid(list){
     const wear=getWearSVG(r.timeMade);
     const flag=r.timeMade>=8?'<div class="flag-corner"></div>':'';
     const photo=r.photoUrl?`<img src="${r.photoUrl}" alt="${r.name}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=rc-photo-placeholder ${catThumbs[r.cat]}>${r.emoji}</div>'">`:`<div class="rc-photo-placeholder ${catThumbs[r.cat]}">${r.emoji}</div>`;
-    return`<div class="rc" onclick="openCookbook(${r.id})"><div class="rc-edit-btn" onclick="event.stopPropagation();openCookbook(${r.id},true)"><i class="ti ti-pencil"></i></div>${wear}<div class="rc-photo">${photo}<div class="rc-photo-overlay"></div><div class="rc-photo-emoji">${r.emoji}</div><div class="profile-stack">${avatars}</div>${flag}</div><div class="rc-body"><div class="rc-name">${r.name}</div><div class="rc-meta"><div class="src-dot ${srcDot[r.src]}"></div><span class="rc-time">${r.time}</span></div><div class="rc-stars">${starHTML(r.rating||0)}</div><div class="rc-tags">${tags}</div></div></div>`;
+    return`<div class="rc" onclick="openCookbook(${r.id})"><div class="rc-edit-btn" onclick="event.stopPropagation();openCookbook(${r.id},true)"><i class="ti ti-pencil"></i></div>${wear}<div class="rc-photo">${photo}<div class="rc-photo-overlay"></div><div class="profile-stack">${avatars}</div>${flag}</div><div class="rc-body"><div class="rc-name">${r.name}</div><div class="rc-meta"><div class="src-dot ${srcDot[r.src]}"></div><span class="rc-time">${r.time}</span></div><div class="rc-stars">${starHTML(r.rating||0)}</div><div class="rc-tags">${tags}</div></div></div>`;
   }).join('');
   updateCounts();
 }
@@ -535,9 +569,181 @@ function setView(cat,el){currentCat=cat;document.querySelectorAll('.ni').forEach
 function setTagFilter(tag,el){activeTagFilter=tag;document.querySelectorAll('.fchip').forEach(c=>c.classList.remove('active'));if(el)el.classList.add('active');filterRecipes(document.getElementById('search-inp').value);}
 function setProfileFilter(pid,el){activeProfileFilter=pid;document.querySelectorAll('.pchip').forEach(c=>c.classList.remove('active'));if(el)el.classList.add('active');filterRecipes(document.getElementById('search-inp').value);}
 function updateCounts(){['all','breakfast','lunch','dinner','snack','dessert'].forEach(c=>{const el=document.getElementById('cnt-'+c);if(el)el.textContent=c==='all'?recipes.length:recipes.filter(r=>r.cat===c).length;});}
-function toggleSidebar(e){e&&e.stopPropagation();document.getElementById('sidebar').classList.toggle('open');}
+function toggleSidebar(e){e&&e.stopPropagation();document.getElementById('sidebar').classList.toggle('open');updateSidebarBackdrop();}
+function closeSidebar(){document.getElementById('sidebar').classList.remove('open');updateSidebarBackdrop();}
+function updateSidebarBackdrop(){
+  const open=document.getElementById('sidebar').classList.contains('open');
+  let bd=document.getElementById('sidebar-backdrop');
+  if(open&&window.innerWidth<=700){
+    if(!bd){bd=document.createElement('div');bd.id='sidebar-backdrop';bd.style.cssText='position:fixed;inset:0;z-index:49;background:rgba(26,24,20,.4)';bd.onclick=closeSidebar;document.getElementById('app').appendChild(bd);}
+  } else {bd&&bd.remove();}
+}
 function togglePanel(e){e&&e.stopPropagation();document.getElementById('panel').classList.toggle('open');}
-function closeSidebarsOnMobile(e){if(window.innerWidth>700)return;const s=document.getElementById('sidebar'),p=document.getElementById('panel');if(!s.contains(e.target))s.classList.remove('open');if(!p.contains(e.target))p.classList.remove('open');}
+function closeSidebarsOnMobile(e){
+  if(window.innerWidth>700)return;
+  const s=document.getElementById('sidebar');
+  if(s.classList.contains('open')&&!s.contains(e.target)){closeSidebar();}
+}
+
+const SHEET_TITLES={import:'Add recipe',planner:'Meal planner',grocery:'Grocery list',pantry:'Pantry scan',discover:'Discover',profile:'Profiles'};
+
+// navTo: on desktop opens the panel tab; on mobile opens a full-screen sheet
+function navTo(tab){
+  if(window.innerWidth<=700){closeSidebar();openMobileSheet(tab);}
+  else{showPanelTab(tab);}
+}
+
+function openMobileSheet(tab){
+  closeMobileSheet();
+  const ov=document.createElement('div');ov.className='mobile-sheet-overlay';ov.id='mobile-sheet-overlay';
+  ov.onclick=(e)=>{if(e.target===ov)closeMobileSheet();};
+  const sheet=document.createElement('div');sheet.className='mobile-sheet';
+  sheet.innerHTML=`<div class="mobile-sheet-handle"></div>
+    <div class="mobile-sheet-header">
+      <span class="mobile-sheet-title">${SHEET_TITLES[tab]||tab}</span>
+      <button class="mobile-sheet-close" onclick="closeMobileSheet()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="mobile-sheet-body" id="mobile-sheet-body"></div>`;
+  ov.appendChild(sheet);document.getElementById('app').appendChild(ov);
+  renderMobileSheetContent(tab);
+}
+
+function renderMobileSheetContent(tab){
+  const body=document.getElementById('mobile-sheet-body');if(!body)return;
+  if(tab==='import'){
+    body.innerHTML=`<div id="import-mode-select-m">
+      <div class="section-lbl">Add a recipe from</div>
+      <div class="import-opts">
+        <div class="iopt" onclick="setImportMode('screenshots','m')"><i class="ti ti-camera"></i><div class="ot">Screenshots</div><div class="od">Add multiple images</div></div>
+        <div class="iopt" onclick="setImportMode('url','m')"><i class="ti ti-link"></i><div class="ot">URL</div><div class="od">Any recipe website</div></div>
+        <div class="iopt" onclick="setImportMode('text','m')"><i class="ti ti-pencil"></i><div class="ot">Paste text</div><div class="od">Any format</div></div>
+        <div class="iopt" onclick="setImportMode('photo','m')"><i class="ti ti-photo"></i><div class="ot">Single photo</div><div class="od">One image</div></div>
+      </div></div>
+      <div id="import-input-area-m" style="display:none;flex-direction:column;gap:9px"></div>
+      <div id="import-result-area-m" style="display:none;flex-direction:column;gap:9px"></div>`;
+  } else if(tab==='grocery'){
+    body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="section-lbl" style="margin-bottom:0">Grocery list</div>
+      <button class="btn-ghost" style="font-size:10px;padding:4px 8px" onclick="clearChecked()">Clear checked</button></div>
+      <div id="grocery-list-body-m"></div>
+      <div style="border-top:1px solid var(--rule);padding-top:10px">
+        <div class="tag-input-row"><input class="tag-input" id="grocery-add-inp-m" placeholder="Add item&hellip;" onkeydown="if(event.key==='Enter')addGroceryItemM()"><button class="btn-primary" style="padding:5px 9px;font-size:11px" onclick="addGroceryItemM()">Add</button></div>
+      </div>`;
+    renderGroceryListM();
+  } else if(tab==='planner'){
+    body.innerHTML=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div class="section-lbl" style="margin-bottom:0">This week</div>
+      <button class="btn-primary" style="font-size:10px;padding:4px 8px" onclick="generateMealPlan()"><i class="ti ti-sparkles"></i> Auto-plan</button></div>
+      <div style="font-size:10px;color:var(--ink4);margin-bottom:8px">Click any slot to choose a recipe.</div>
+      <div class="planner-grid" id="planner-grid-m"></div>
+      <button class="btn-ghost" style="width:100%;justify-content:center;font-size:11px;margin-top:8px" onclick="addPlannerToGrocery()"><i class="ti ti-shopping-cart"></i> Add all to grocery</button>`;
+    renderPlannerM();
+  } else if(tab==='pantry'){
+    body.innerHTML=`<div style="font-size:12px;color:var(--ink3);line-height:1.6;margin-bottom:12px">Take a photo of your fridge or pantry &mdash; Claude identifies your ingredients and matches them to recipes.</div>
+      <div id="pantry-upload-area-m">
+        <div class="pantry-drop" onclick="document.getElementById('pantry-file-m').click()" ondragover="event.preventDefault()" ondrop="handlePantryDropM(event)">
+          <i class="ti ti-camera" style="font-size:22px;color:var(--ink4);display:block;margin-bottom:8px"></i>
+          <div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop pantry photo here</div>
+          <div style="font-size:11px;color:var(--ink4)">or click to browse</div>
+        </div>
+        <input type="file" id="pantry-file-m" accept="image/*" style="display:none" onchange="handlePantryFileM(this)">
+      </div>
+      <div id="pantry-preview-area-m" style="display:none;flex-direction:column;gap:8px">
+        <img id="pantry-img-m" class="pantry-preview" src="" alt="Pantry">
+        <button class="btn-primary" style="width:100%;justify-content:center" onclick="scanPantryM()"><i class="ti ti-scan"></i> Scan for recipes</button>
+        <button class="btn-ghost" style="width:100%;text-align:center" onclick="resetPantryM()">Use a different photo</button>
+      </div>
+      <div id="pantry-results-m" style="display:none;flex-direction:column;gap:8px"></div>`;
+  } else if(tab==='discover'){
+    body.style.padding='0';
+    body.style.display='flex';body.style.flexDirection='column';body.style.flex='1';body.style.overflow='hidden';body.style.minHeight='400px';
+    body.innerHTML=`<div class="discover-profile-row">
+        <span style="font-size:10px;color:var(--ink4);align-self:center;white-space:nowrap">For:</span>
+        <div class="dprofile-chip active" data-pid="all" onclick="toggleDiscoverProfile(this)">&#x1F46A; Everyone</div>
+        <div class="dprofile-chip" data-pid="maya" onclick="toggleDiscoverProfile(this)">&#x1F469; Maya</div>
+        <div class="dprofile-chip" data-pid="dad" onclick="toggleDiscoverProfile(this)">&#x1F468; Dad</div>
+        <div class="dprofile-chip" data-pid="luca" onclick="toggleDiscoverProfile(this)">&#x1F9D2; Luca</div>
+      </div>
+      <div class="chat-area" id="discover-chat-m" style="flex:1;overflow-y:auto;padding:13px;display:flex;flex-direction:column;gap:8px">
+        <div class="msg ai" style="font-size:11px;line-height:1.6">Tell me what you&rsquo;re craving &mdash; I&rsquo;ll find a real recipe for you to save or skip.</div>
+        <div class="hint-chips">
+          <div class="chip" onclick="sendDiscoverM(this.textContent)">Something cosy tonight</div>
+          <div class="chip" onclick="sendDiscoverM(this.textContent)">New dessert</div>
+          <div class="chip" onclick="sendDiscoverM(this.textContent)">Quick weekday lunch</div>
+        </div>
+      </div>
+      <div class="chat-input-row">
+        <textarea id="discover-input-m" placeholder="What are you hungry for?" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendDiscoverM()}"></textarea>
+        <button class="send-btn" onclick="sendDiscoverM()"><i class="ti ti-arrow-right"></i></button>
+      </div>`;
+  } else if(tab==='profile'){
+    body.innerHTML=`<div class="section-lbl">Family profiles</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--paper3);border-radius:var(--r2);background:var(--paper)"><div style="width:32px;height:32px;border-radius:50%;background:#fde8c8;display:flex;align-items:center;justify-content:center;font-size:16px">&#x1F469;</div><div><div style="font-weight:500;font-size:12px">Maya</div><div style="font-size:10px;color:var(--ink4)">Mediterranean &middot; Citrusy</div></div></div>
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--paper3);border-radius:var(--r2);background:var(--paper)"><div style="width:32px;height:32px;border-radius:50%;background:#d4edbe;display:flex;align-items:center;justify-content:center;font-size:16px">&#x1F468;</div><div><div style="font-weight:500;font-size:12px">Dad</div><div style="font-size:10px;color:var(--ink4)">Spicy &middot; Asian flavours</div></div></div>
+        <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--paper3);border-radius:var(--r2);background:var(--paper)"><div style="width:32px;height:32px;border-radius:50%;background:#c8deff;display:flex;align-items:center;justify-content:center;font-size:16px">&#x1F9D2;</div><div><div style="font-weight:500;font-size:12px">Luca</div><div style="font-size:10px;color:var(--ink4)">Mild &middot; Kid-friendly</div></div></div>
+      </div>`;
+  }
+}
+
+function closeMobileSheet(){const o=document.getElementById('mobile-sheet-overlay');if(o)o.remove();}
+
+// Mobile grocery helpers (operate on -m suffixed elements)
+function renderGroceryListM(){
+  const body=document.getElementById('grocery-list-body-m');if(!body)return;
+  if(!groceryItems.length){body.innerHTML='<div style="font-size:12px;color:var(--ink4);padding:10px 0;text-align:center;font-style:italic">Your list is empty.</div>';return;}
+  const cats=[...new Set(groceryItems.map(g=>g.cat))];
+  body.innerHTML=cats.map(cat=>`<div class="grocery-section"><div class="grocery-category">${cat}</div>${groceryItems.filter(g=>g.cat===cat).map((g)=>{const idx=groceryItems.indexOf(g);return`<div class="grocery-item"><input type="checkbox" id="gim${idx}" ${g.checked?'checked':''} onchange="toggleGrocery(${idx});renderGroceryListM()"><label for="gim${idx}" class="${g.checked?'checked':''}">${g.amt?g.amt+' ':''}<strong>${g.name}</strong></label></div>`;}).join('')}</div>`).join('');
+}
+function addGroceryItemM(){const inp=document.getElementById('grocery-add-inp-m');if(!inp||!inp.value.trim())return;groceryItems.push({name:inp.value.trim(),amt:'',cat:'other',checked:false});inp.value='';renderGroceryList();renderGroceryListM();}
+
+// Mobile planner (renders into planner-grid-m)
+function renderPlannerM(){
+  const grid=document.getElementById('planner-grid-m');if(!grid)return;
+  grid.innerHTML=DAYS.map(day=>`<div class="planner-day"><div class="planner-day-label">${day}</div>${MEALS.map(meal=>{
+    const key=`${day}-${meal}`;const r=plannerData[key];
+    return r?`<div class="planner-slot filled" onclick="openPlannerPicker('${key}')"><span class="slot-emoji">${r.emoji}</span><span>${r.name}</span><span class="slot-clear" onclick="event.stopPropagation();clearPlannerSlot('${key}');renderPlannerM()">&times;</span></div>`
+            :`<div class="planner-slot" onclick="openPlannerPicker('${key}')">+</div>`;
+  }).join('')}</div>`).join('');
+}
+
+// Mobile pantry (mirrors desktop pantry but with -m element IDs)
+let pantryImageDataM=null;
+function handlePantryDropM(e){e.preventDefault();const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadPantryFileM(f);}
+function handlePantryFileM(inp){if(inp.files[0])loadPantryFileM(inp.files[0]);}
+function loadPantryFileM(file){const reader=new FileReader();reader.onload=e=>{pantryImageDataM=e.target.result;document.getElementById('pantry-img-m').src=pantryImageDataM;document.getElementById('pantry-upload-area-m').style.display='none';const pa=document.getElementById('pantry-preview-area-m');pa.style.display='flex';pa.style.flexDirection='column';};reader.readAsDataURL(file);}
+function resetPantryM(){pantryImageDataM=null;document.getElementById('pantry-upload-area-m').style.display='block';document.getElementById('pantry-preview-area-m').style.display='none';document.getElementById('pantry-results-m').style.display='none';}
+async function scanPantryM(){
+  if(!pantryImageDataM)return;const pr=document.getElementById('pantry-results-m');pr.style.display='flex';pr.style.flexDirection='column';
+  pr.innerHTML=`<div class="processing-card"><i class="ti ti-loader spinner"></i> Scanning&hellip;</div>`;document.getElementById('pantry-preview-area-m').style.display='none';
+  const lib=JSON.stringify(recipes.map(r=>({id:r.id,name:r.name,cat:r.cat,ings:r.ings.map(i=>i.name)})));
+  const sys=`Identify visible ingredients then match to this recipe library:\n${lib}\nReturn ONLY JSON: {"identified_ingredients":["..."],"matches":[{"recipe_id":"...","have":["..."],"missing":["..."],"note":"..."}]}`;
+  try{const b64=pantryImageDataM.split(',')[1],mt=pantryImageDataM.split(';')[0].split(':')[1];const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:sys,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:'What can I make tonight?'}]}]})});const data=await res.json();const result=JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());let html=`<div><div class="section-lbl">Spotted</div><div style="font-size:11px;color:var(--ink3);line-height:1.7">${(result.identified_ingredients||[]).join(', ')||'None identified'}</div></div><div class="section-lbl" style="margin-top:4px">Options</div>`;(result.matches||[]).forEach(m=>{const r=recipes.find(x=>x.id===m.recipe_id||x.id==m.recipe_id);if(!r)return;html+=`<div style="border:1px solid var(--paper3);border-radius:var(--r2);padding:10px 11px;cursor:pointer;background:var(--paper);margin-bottom:6px" onclick="closeMobileSheet();openCookbook('${r.id}')"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><span>${r.emoji}</span><span style="font-size:12px;font-weight:500;font-family:Lora,serif">${r.name}</span><span class="cat-pill ${catPills[r.cat]}" style="margin-left:auto">${r.cat}</span></div><div style="font-size:11px;color:var(--ink3);line-height:1.4;margin-bottom:4px">${m.note}</div><div style="display:flex;gap:3px;flex-wrap:wrap">${(m.have||[]).slice(0,3).map(h=>`<span class="match-tag">\u2713 ${h}</span>`).join('')}${(m.missing||[]).slice(0,2).map(x=>`<span class="missing-tag">need ${x}</span>`).join('')}</div></div>`;});html+=`<button class="btn-ghost" style="width:100%;text-align:center" onclick="resetPantryM()">Scan different photo</button>`;pr.innerHTML=html;}catch(e){pr.innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">Couldn't read the pantry.</div><button class="btn-ghost" style="width:100%;text-align:center;margin-top:8px" onclick="resetPantryM()">Try again</button>`;}
+}
+
+// Mobile discover
+async function sendDiscoverM(prefill){
+  const input=document.getElementById('discover-input-m');const text=prefill||input?.value.trim();if(!text||discoverLoading)return;
+  if(input)input.value='';discoverLoading=true;
+  const chat=document.getElementById('discover-chat-m');if(!chat)return;
+  const chips=chat.querySelector('.hint-chips');if(chips)chips.style.display='none';
+  const um=document.createElement('div');um.className='msg user';um.textContent=text;chat.appendChild(um);
+  const am=document.createElement('div');am.className='msg ai loading';am.textContent='Finding a recipe\u2026';chat.appendChild(am);chat.scrollTop=chat.scrollHeight;
+  try{
+    const profileCtx=buildDiscoverProfileContext();
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:DISCOVER_SYSTEM+profileCtx,messages:[{role:'user',content:text}]})});
+    const data=await res.json();const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    const result=JSON.parse(raw);
+    if(result.found&&result.recipe){
+      const r=result.recipe;const photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent(r.photoSearchQuery||r.name+' food')}`;
+      am.className='msg ai';am.textContent=result.search_description||`Found: ${r.name}`;
+      const card=document.createElement('div');card.className='discover-recipe-card';
+      card.innerHTML=`<div class="drc-photo"><img src="${photoUrl}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover"></div><div class="drc-body"><div class="drc-title">${r.name}</div><div class="drc-meta"><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span> &nbsp;${r.time}</div><div class="drc-ings">${(r.ingredients||[]).slice(0,4).map(i=>i.name).join(', ')}</div><div class="drc-actions"><button class="btn-primary" style="flex:1;font-size:11px;justify-content:center" onclick="saveDiscoveredRecipe(this)">Save to library</button><button class="btn-ghost" style="font-size:11px" onclick="this.closest('.discover-recipe-card').remove()">Keep looking</button></div></div>`;
+      card.dataset.recipe=JSON.stringify({...r,photoUrl});chat.appendChild(card);
+    }else{am.className='msg ai';am.textContent=result.message||"Couldn't find a match. Try again.";}
+  }catch(e){am.className='msg ai';am.textContent='Something went wrong.';}
+  discoverLoading=false;chat.scrollTop=chat.scrollHeight;
+}
 let cbRecipe=null,cbServings=2,cbTab='recipe',cbEditDraft=null,cbCheckedIngs=new Set();
 function openCookbook(id,startInEdit){cbRecipe=recipes.find(r=>r.id===id);cbServings=cbRecipe.baseServings;cbTab=startInEdit?'edit':'recipe';cbCheckedIngs=new Set();renderCookbook();document.getElementById('cookbook-overlay').style.display='flex';}
 function closeCookbook(){document.getElementById('cookbook-overlay').style.display='none';cbRecipe=null;cbEditDraft=null;}
@@ -552,16 +758,36 @@ function renderCookbook(){
           <div class="cb-meta-row"><span class="cat-pill ${catPills[r.cat]}">${r.cat}</span><span class="cb-meta-item"><i class="ti ti-clock" style="font-size:13px"></i> ${r.time}</span><span class="cb-meta-item"><i class="ti ti-repeat" style="font-size:13px"></i> Made ${r.timeMade}&times;</span><span class="cb-stars-display">${starHTML(r.rating||0)}</span></div>
           <div class="cb-tags-row">${r.tags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div></div></div>
       <div id="cb-recipe-body"></div>
+      <div id="cb-source-line"></div>
       <div class="cb-tabs"><div class="cb-tab ${cbTab==='edit'?'active':''}" data-tab="edit" onclick="switchCbTab('edit')"><i class="ti ti-pencil" style="font-size:11px"></i> Edit recipe</div><div class="cb-tab ${cbTab==='notes'?'active':''}" data-tab="notes" onclick="switchCbTab('notes')">Notes &amp; rating</div><div class="cb-tab ${cbTab==='details'?'active':''}" data-tab="details" onclick="switchCbTab('details')">Tags &amp; profiles</div></div>
       <div class="cb-tab-body" id="cb-tab-body"></div>
     </div></div>`;
-  renderCbRecipeBody();if(cbTab!=='recipe')renderCbTabBody();
+  renderCbRecipeBody();renderCbSourceLine();if(cbTab!=='recipe')renderCbTabBody();
 }
 function renderCbRecipeBody(){
   const r=cbRecipe;const ratio=cbServings/r.baseServings,changed=cbServings!==r.baseServings;
   const ings=r.ings.map((ing,i)=>{const amt=fmtAmt(ing,ratio),chk=cbCheckedIngs.has(i);return`<div class="cb-ing-row"><div class="cb-ing-check ${chk?'checked':''}" onclick="toggleCbIngCheck(${i})">${chk?'<i class="ti ti-check"></i>':''}</div><span class="cb-ing-amt ${changed&&ing.qty!=null?'changed':''}">${amt}</span><span style="flex:1;font-size:13.5px;color:var(--ink2)">${ing.name}</span></div>`;}).join('');
   const steps=r.steps.map((s,i)=>{const edit=r.edits&&r.edits.find(e=>e.step===i);const sc=edit?`<span class="cb-edit-wrap"><span class="cb-original-text">${edit.original}<svg class="cb-strike" viewBox="0 0 100 8" preserveAspectRatio="none"><path d="M0,4 Q20,1 40,5 Q65,8 80,3 Q90,1 100,4" fill="none" stroke="#8b5e3c" stroke-width="2" stroke-linecap="round"/></svg></span><span class="cb-handwrite">${edit.edit}</span></span>`:s;return`<div class="cb-step"><div class="cb-step-num">${String(i+1).padStart(2,'0')}</div><div class="cb-step-text">${sc}</div></div>`;}).join('');
   document.getElementById('cb-recipe-body').innerHTML=`<div class="cb-two-col"><div class="cb-ingredients-col"><div class="cb-section-title"><i class="ti ti-list"></i> Ingredients</div><div class="cb-scaler"><div class="cb-scaler-row"><span style="font-size:12px;color:var(--ink3);flex:1">Servings</span><button class="cb-scaler-btn" onclick="changeCbServings(-1)">&minus;</button><span class="cb-scaler-val">${cbServings}</span><button class="cb-scaler-btn" onclick="changeCbServings(1)">+</button></div><div style="font-size:10px;color:var(--ink4);margin-top:5px">${changed?'Scaled from '+r.baseServings:'Original recipe'}</div></div><div>${ings}</div><button class="btn-primary" style="margin-top:14px;width:100%;justify-content:center" onclick="addSelectedToGrocery()"><i class="ti ti-shopping-cart"></i> Add selected to grocery</button><div style="font-size:10px;color:var(--ink4);margin-top:6px;text-align:center">Check items you need, or leave unchecked to add all.</div></div><div><div class="cb-section-title"><i class="ti ti-tools-kitchen-2"></i> Method</div><div class="cb-steps-list">${steps}</div></div></div>`;
+}
+function renderCbSourceLine(){
+  const el=document.getElementById('cb-source-line');if(!el)return;
+  const r=cbRecipe;
+  const srcLabels={photo:'Imported from a photo',screenshot:'Imported from a screenshot',manual:'Added manually'};
+  let txt='';
+  if(r.sourceLabel){
+    // try to detect if it looks like a URL
+    if(r.sourceLabel.startsWith('http')){
+      try{const host=new URL(r.sourceLabel).hostname.replace('www.','');txt=`Recipe from <a href="${r.sourceLabel}" target="_blank" rel="noopener">${host}</a>`;}
+      catch{txt=`Recipe from <em>${r.sourceLabel}</em>`;}
+    } else { txt=r.sourceLabel; }
+  } else if(r.src==='url'&&r.sourceUrl){
+    try{const host=new URL(r.sourceUrl).hostname.replace('www.','');txt=`Recipe from <a href="${r.sourceUrl}" target="_blank" rel="noopener">${host}</a>`;}
+    catch{txt=`Recipe source: ${r.sourceUrl}`;}
+  } else if(srcLabels[r.src]){
+    txt=srcLabels[r.src];
+  }
+  el.innerHTML=txt?`<div class="cb-source-credit">${txt}</div>`:'';
 }
 function changeCbServings(d){cbServings=Math.max(1,cbServings+d);renderCbRecipeBody();}
 function toggleCbIngCheck(i){if(cbCheckedIngs.has(i))cbCheckedIngs.delete(i);else cbCheckedIngs.add(i);renderCbRecipeBody();}
@@ -621,7 +847,34 @@ async function scanPantry(){
   const sys=`Identify visible ingredients then match to this recipe library:\n${lib}\nReturn ONLY JSON: {"identified_ingredients":["..."],"matches":[{"recipe_id":N,"have":["..."],"missing":["..."],"note":"..."}]}`;
   try{const b64=pantryImageData.split(',')[1],mt=pantryImageData.split(';')[0].split(':')[1];const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:sys,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:'What can I make tonight?'}]}]})});const data=await res.json();const result=JSON.parse(data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim());let html=`<div><div class="section-lbl">Ingredients spotted</div><div style="font-size:11px;color:var(--ink3);line-height:1.7">${(result.identified_ingredients||[]).join(', ')||'None identified'}</div></div><div class="section-lbl" style="margin-top:4px">Tonight's options</div>`;(result.matches||[]).forEach(m=>{const r=recipes.find(x=>x.id===m.recipe_id);if(!r)return;html+=`<div style="border:1px solid var(--paper3);border-radius:var(--r2);padding:10px 11px;cursor:pointer;background:var(--paper);margin-bottom:6px" onclick="openCookbook(${r.id})"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px"><span style="font-size:17px">${r.emoji}</span><span style="font-size:12px;font-weight:500;font-family:Lora,serif">${r.name}</span><span class="cat-pill ${catPills[r.cat]}" style="margin-left:auto">${r.cat}</span></div><div style="font-size:11px;color:var(--ink3);line-height:1.4;margin-bottom:5px">${m.note}</div><div style="display:flex;gap:3px;flex-wrap:wrap">${(m.have||[]).slice(0,3).map(h=>`<span class="match-tag">\u2713 ${h}</span>`).join('')}${(m.missing||[]).slice(0,2).map(x=>`<span class="missing-tag">need ${x}</span>`).join('')}</div></div>`;});html+=`<button class="btn-ghost" style="width:100%;text-align:center" onclick="resetPantry()">Scan different photo</button>`;pr.innerHTML=html;}catch(e){pr.innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">Couldn't read the pantry. Try a clearer, well-lit photo.</div><button class="btn-ghost" style="width:100%;text-align:center;margin-top:8px" onclick="resetPantry()">Try again</button>`;}
 }
-const DISCOVER_SYSTEM=`You are a recipe discovery assistant for a recipe app. The user's profile: loves Asian flavours, Mediterranean, bold spicy food, citrusy dishes, fresh herbs; prefers quick weeknight meals (under 45 min) but enjoys weekend projects.
+const PROFILE_PREFS={
+  all:'The family enjoys: Asian flavours, Mediterranean, bold spicy food, citrusy dishes, fresh herbs. Prefer quick weeknight meals under 45 min.',
+  maya:'Maya loves: Mediterranean, citrusy dishes, fresh herbs, light proteins. Avoids very spicy food.',
+  dad:'Dad loves: Bold Asian flavours, spicy food, rich umami, grilling. Enjoys weekend cooking projects.',
+  luca:'Luca prefers: Mild, kid-friendly flavours. Likes pasta, simple proteins, nothing too spicy.'
+};
+let discoverActiveProfiles=['all'];
+
+function toggleDiscoverProfile(el){
+  const pid=el.dataset.pid;
+  if(pid==='all'){
+    discoverActiveProfiles=['all'];
+    document.querySelectorAll('.dprofile-chip').forEach(c=>c.classList.toggle('active',c.dataset.pid==='all'));
+  } else {
+    discoverActiveProfiles=discoverActiveProfiles.filter(p=>p!=='all');
+    el.classList.toggle('active');
+    discoverActiveProfiles=Array.from(document.querySelectorAll('.dprofile-chip.active')).map(c=>c.dataset.pid).filter(p=>p!=='all');
+    if(!discoverActiveProfiles.length){discoverActiveProfiles=['all'];document.querySelectorAll('.dprofile-chip').forEach(c=>c.classList.toggle('active',c.dataset.pid==='all'));}
+  }
+}
+
+function buildDiscoverProfileContext(){
+  if(discoverActiveProfiles.includes('all'))return '';
+  const prefs=discoverActiveProfiles.map(p=>PROFILE_PREFS[p]).filter(Boolean).join(' ');
+  return `\n\nCooking for: ${discoverActiveProfiles.join(' + ')}. Their preferences: ${prefs}`;
+}
+
+const DISCOVER_SYSTEM=`You are a recipe discovery assistant for a recipe app.
 When the user tells you what they want, return ONLY this JSON (no prose, no markdown):
 {"found":true,"search_description":"one sentence describing what you found and why","recipe":{"name":"...","category":"breakfast|lunch|dinner|snack|dessert","emoji":"single emoji","time":"e.g. 35 min","baseServings":4,"tags":["tag1","tag2"],"photoSearchQuery":"descriptive phrase for finding a photo","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}}
 If nothing fits: {"found":false,"message":"brief explanation"}`;
@@ -633,7 +886,8 @@ async function sendDiscover(prefill){
   const um=document.createElement('div');um.className='msg user';um.textContent=text;chat.appendChild(um);
   const am=document.createElement('div');am.className='msg ai loading';am.textContent='Finding a recipe for you\u2026';chat.appendChild(am);chat.scrollTop=chat.scrollHeight;
   try{
-    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:DISCOVER_SYSTEM,messages:[{role:'user',content:text}]})});
+    const profileCtx=buildDiscoverProfileContext();
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:DISCOVER_SYSTEM+profileCtx,messages:[{role:'user',content:text}]})});
     const data=await res.json();const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
     const result=JSON.parse(raw);
     if(result.found&&result.recipe){
@@ -648,21 +902,22 @@ async function sendDiscover(prefill){
 }
 async function saveDiscoveredRecipe(btn){
   const card=btn.closest('.discover-recipe-card');const raw=JSON.parse(card.dataset.recipe);
-  const newRecipe={id:Date.now(),name:raw.name,cat:raw.category,emoji:raw.emoji||'\u{1F37D}',src:'url',time:raw.time,baseServings:raw.baseServings||2,timeMade:0,rating:0,notes:'',tags:raw.tags||[],profiles:[],edits:[],photoUrl:raw.photoUrl||'',ings:(raw.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:raw.steps||[]};
+  const newRecipe={id:Date.now(),name:raw.name,cat:raw.category,emoji:raw.emoji||'\u{1F37D}',src:'url',time:raw.time,baseServings:raw.baseServings||2,timeMade:0,rating:0,notes:'',tags:raw.tags||[],profiles:[],edits:[],photoUrl:raw.photoUrl||'',sourceLabel:'Discovered via Mise',ings:(raw.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:raw.steps||[]};
   recipes.push(newRecipe);
   filterRecipes(document.getElementById('search-inp').value);
   card.innerHTML=`<div style="padding:14px 12px;font-size:12px;color:var(--success);display:flex;align-items:center;gap:8px"><i class="ti ti-check" style="font-size:16px"></i> Saved to your library!</div>`;
   setTimeout(()=>card.remove(),2000);showToast(`${raw.name} saved!`);
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
-let importMode=null,screenshotQueue=[],pendingImageData=null;
+let importMode=null,screenshotQueue=[],pendingImageData=null,importCtx='';
 const EXTRACT_PROMPT=`Extract the recipe from the provided source(s) and return ONLY valid JSON (no markdown):
 {"name":"...","category":"breakfast|lunch|dinner|snack|dessert","emoji":"single emoji","time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"photoSearchQuery":"descriptive phrase for a food photo search","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
 If multiple images are provided, compile them into one complete recipe. Auto-generate 2-3 relevant tags. Return valid JSON only.`;
-function setImportMode(mode){
-  importMode=mode;screenshotQueue=[];pendingImageData=null;
-  document.getElementById('import-mode-select').style.display='none';
-  const area=document.getElementById('import-input-area');area.style.display='flex';document.getElementById('import-result-area').style.display='none';
+function setImportMode(mode,ctx){
+  importMode=mode;importCtx=ctx||'';screenshotQueue=[];pendingImageData=null;
+  const sfx=importCtx?'-'+importCtx:'';
+  document.getElementById('import-mode-select'+sfx).style.display='none';
+  const area=document.getElementById('import-input-area'+sfx);area.style.display='flex';document.getElementById('import-result-area'+sfx).style.display='none';
   if(mode==='screenshots'){
     area.innerHTML=`<div class="section-lbl">Add screenshots (multiple OK)</div><div style="font-size:11px;color:var(--ink3);margin-bottom:8px;line-height:1.5">Add all screenshots of the recipe &mdash; Claude compiles them into one.</div><div class="screenshot-queue" id="sq-row"><div class="sq-add" onclick="document.getElementById('sq-file-inp').click()">+</div></div><input type="file" id="sq-file-inp" accept="image/*" multiple style="display:none" onchange="addScreenshots(this)"><div id="sq-count" style="font-size:11px;color:var(--ink4);margin-top:4px"></div><button class="btn-primary" id="sq-extract-btn" style="display:none;width:100%;margin-top:4px" onclick="extractFromScreenshots()"><i class="ti ti-sparkles"></i> Compile recipe from screenshots</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
   }else if(mode==='photo'){
@@ -681,26 +936,41 @@ function handleImgDrop(e){e.preventDefault();document.getElementById('drop-z').c
 function handleFileSelect(inp){if(inp.files[0])loadImgFile(inp.files[0]);}
 function loadImgFile(file){const r=new FileReader();r.onload=e=>{pendingImageData=e.target.result;const pv=document.getElementById('img-preview');pv.style.display='block';pv.innerHTML=`<img src="${pendingImageData}" style="width:100%;border-radius:var(--r2);border:1px solid var(--paper3);max-height:120px;object-fit:cover">`;document.getElementById('parse-img-btn').style.display='block';document.getElementById('drop-z').style.display='none';};r.readAsDataURL(file);}
 async function parseImage(){if(!pendingImageData)return;showProcessing('Reading recipe from image\u2026');const b64=pendingImageData.split(',')[1],mt=pendingImageData.split(';')[0].split(':')[1];await callExtract([{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:EXTRACT_PROMPT}]}]);}
-async function parseUrl(){const url=document.getElementById('url-inp').value.trim();if(!url)return;showProcessing('Extracting recipe\u2026');await callExtract([{role:'user',content:`${EXTRACT_PROMPT}\n\nURL: ${url}\n\nNote: invent a plausible recipe for that domain.`}]);}
+let lastImportUrl='';
+async function parseUrl(){const url=document.getElementById('url-inp')?.value.trim()||document.getElementById('url-inp-m')?.value.trim()||'';if(!url)return;lastImportUrl=url;showProcessing('Extracting recipe\u2026');await callExtract([{role:'user',content:`${EXTRACT_PROMPT}\n\nURL: ${url}\n\nNote: invent a plausible recipe for that domain.`}]);}
 async function parseText(){const text=document.getElementById('text-inp').value.trim();if(!text)return;showProcessing('Structuring recipe\u2026');await callExtract([{role:'user',content:`${EXTRACT_PROMPT}\n\nRecipe text:\n${text}`}]);}
-function showProcessing(msg){document.getElementById('import-input-area').style.display='none';const ra=document.getElementById('import-result-area');ra.style.display='flex';ra.innerHTML=`<div class="processing-card"><i class="ti ti-loader spinner"></i> ${msg}</div>`;}
+function showProcessing(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-input-area'+sfx).style.display='none';const ra=document.getElementById('import-result-area'+sfx);ra.style.display='flex';ra.innerHTML=`<div class="processing-card"><i class="ti ti-loader spinner"></i> ${msg}</div>`;}
 async function callExtract(messages){try{const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,messages})});const data=await res.json();handleExtractResult(data.content.map(b=>b.text||'').join(''));}catch(e){showImportError('Something went wrong. Check your connection.');}}
 async function handleExtractResult(text){
   try{
     const r=JSON.parse(text.replace(/```json|```/g,'').trim());
     const photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name)+' food recipe')}`;
-    const ra=document.getElementById('import-result-area');
+    const sfx=importCtx?'-'+importCtx:'';
+    const ra=document.getElementById('import-result-area'+sfx);
     ra.innerHTML=`<div class="section-lbl">Extracted &mdash; looks right?</div><div class="result-card"><div style="height:120px;overflow:hidden;border-radius:var(--r2) var(--r2) 0 0;background:var(--paper3)"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" alt="${r.name}" onerror="this.style.display='none'"></div><div class="rc-body2"><div style="font-family:'Lora',serif;font-size:13px;font-weight:500;margin-bottom:4px">${r.name}</div><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span><span style="font-size:11px;color:var(--ink4);margin-left:5px">${r.time} &middot; ${r.baseServings||2} servings</span><div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:6px">${(r.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div><div style="display:flex;gap:6px;margin-top:10px"><div class="btn-primary" style="flex:1;text-align:center;cursor:pointer" onclick='saveExtracted(${JSON.stringify({...r,photoUrl}).replace(/'/g,"&#39;")})'>Save to library</div><div class="btn-ghost" style="cursor:pointer" onclick="resetImport()">Discard</div></div></div></div>`;
   }catch(e){showImportError('Could not parse a recipe. Try a clearer image or paste the text.');}
 }
-function showImportError(msg){document.getElementById('import-result-area').innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">${msg}</div><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Try again</button>`;}
+function showImportError(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-result-area'+sfx).innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">${msg}</div><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Try again</button>`;}
 async function saveExtracted(r){
-  const newRecipe={id:Date.now(),name:r.name,cat:r.category,emoji:r.emoji||'\u{1F37D}',src:'photo',time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:r.photoUrl||'',ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
+  // Determine source info
+  let src='photo',sourceLabel='',sourceUrl='';
+  if(importMode==='url'){src='url';sourceUrl=r.sourceUrl||lastImportUrl||'';sourceLabel=sourceUrl;}
+  else if(importMode==='screenshots'){src='screenshot';sourceLabel='Imported from screenshots';}
+  else if(importMode==='photo'){src='photo';sourceLabel='Imported from a photo';}
+  else{src='manual';sourceLabel='Added manually';}
+  const newRecipe={id:Date.now(),name:r.name,cat:r.category,emoji:r.emoji||'\u{1F37D}',src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:r.photoUrl||'',sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
   recipes.push(newRecipe);filterRecipes();resetImport();showToast('Recipe saved!');
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
-function resetImport(){importMode=null;screenshotQueue=[];pendingImageData=null;document.getElementById('import-mode-select').style.display='block';document.getElementById('import-input-area').style.display='none';document.getElementById('import-result-area').style.display='none';}
-function openImport(){showPanelTab('import');}
+function resetImport(){
+  const sfx=importCtx?'-'+importCtx:'';
+  importMode=null;screenshotQueue=[];pendingImageData=null;
+  const ms=document.getElementById('import-mode-select'+sfx);if(ms)ms.style.display='block';
+  const ia=document.getElementById('import-input-area'+sfx);if(ia)ia.style.display='none';
+  const ra=document.getElementById('import-result-area'+sfx);if(ra)ra.style.display='none';
+  importCtx='';
+}
+function openImport(){navTo('import');}
 function showPanelTab(tab){const tabs=['import','planner','grocery','pantry','discover','profile'];tabs.forEach(t=>{const p=document.getElementById('panel-'+t),tb=document.getElementById('tab-'+t);if(!p||!tb)return;const active=t===tab;tb.classList.toggle('active',active);p.style.display=active?'flex':'none';if(active){p.style.flexDirection='column';if(t==='planner')renderPlanner();if(t==='grocery')renderGroceryList();}});}
 function fmtAmt(ing,ratio){if(ing.qty==null)return ing.amt;const scaled=ing.qty*ratio;if(ing.unit==='g'||ing.unit==='ml'){if(scaled>=1000&&ing.unit==='ml')return(scaled/1000).toFixed(1)+'L';if(scaled>=1000&&ing.unit==='g')return(scaled/1000).toFixed(1)+'kg';return Math.round(scaled)+ing.unit;}const fracs={0.25:'\u00BC',0.5:'\u00BD',0.75:'\u00BE'};const whole=Math.floor(scaled);const frac=Math.round((scaled-whole)*4)/4;return((whole||'')+(fracs[frac]||'')||String(scaled))+(ing.unit?' '+ing.unit:'');}
 function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
