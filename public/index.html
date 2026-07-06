@@ -371,6 +371,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
           <div class="iopt" onclick="setImportMode('url')"><i class="ti ti-link"></i><div class="ot">URL</div><div class="od">Any recipe website</div></div>
           <div class="iopt" onclick="setImportMode('text')"><i class="ti ti-pencil"></i><div class="ot">Paste text</div><div class="od">Any format</div></div>
           <div class="iopt" onclick="setImportMode('photo')"><i class="ti ti-photo"></i><div class="ot">Single photo</div><div class="od">One image</div></div>
+          <div class="iopt" onclick="setImportMode('pdf')"><i class="ti ti-file-type-pdf"></i><div class="ot">PDF</div><div class="od">Recipe book page</div></div>
         </div>
       </div>
       <div id="import-input-area" style="display:none;flex-direction:column;gap:9px"></div>
@@ -559,7 +560,9 @@ function renderGrid(list){
     const avatars=r.profiles.map(p=>{const pr=profileMap[p];return pr?`<div class="pavatar" style="background:${pr.bg}">${pr.emoji}</div>`:''}).join('');
     const wear=getWearSVG(r.timeMade);
     const flag=r.timeMade>=8?'<div class="flag-corner"></div>':'';
-    const photo=r.photoUrl?`<img src="${r.photoUrl}" alt="${r.name}" loading="lazy" onerror="this.parentNode.innerHTML='<div class=rc-photo-placeholder ${catThumbs[r.cat]}>${r.emoji}</div>'">`:`<div class="rc-photo-placeholder ${catThumbs[r.cat]}">${r.emoji}</div>`;
+    const photo=r.photoUrl
+      ?`<img src="${r.photoUrl}" alt="${r.name}" loading="lazy" onerror="this.parentNode.style.background='var(--paper3)';this.remove()">`
+      :`<div class="rc-photo-placeholder ${catThumbs[r.cat]}" style="background:var(--paper3)"></div>`;
     return`<div class="rc" onclick="openCookbook(${r.id})"><div class="rc-edit-btn" onclick="event.stopPropagation();openCookbook(${r.id},true)"><i class="ti ti-pencil"></i></div>${wear}<div class="rc-photo">${photo}<div class="rc-photo-overlay"></div><div class="profile-stack">${avatars}</div>${flag}</div><div class="rc-body"><div class="rc-name">${r.name}</div><div class="rc-meta"><div class="src-dot ${srcDot[r.src]}"></div><span class="rc-time">${r.time}</span></div><div class="rc-stars">${starHTML(r.rating||0)}</div><div class="rc-tags">${tags}</div></div></div>`;
   }).join('');
   updateCounts();
@@ -618,6 +621,7 @@ function renderMobileSheetContent(tab){
         <div class="iopt" onclick="setImportMode('url','m')"><i class="ti ti-link"></i><div class="ot">URL</div><div class="od">Any recipe website</div></div>
         <div class="iopt" onclick="setImportMode('text','m')"><i class="ti ti-pencil"></i><div class="ot">Paste text</div><div class="od">Any format</div></div>
         <div class="iopt" onclick="setImportMode('photo','m')"><i class="ti ti-photo"></i><div class="ot">Single photo</div><div class="od">One image</div></div>
+        <div class="iopt" onclick="setImportMode('pdf','m')"><i class="ti ti-file-type-pdf"></i><div class="ot">PDF</div><div class="od">Recipe book page</div></div>
       </div></div>
       <div id="import-input-area-m" style="display:none;flex-direction:column;gap:9px"></div>
       <div id="import-result-area-m" style="display:none;flex-direction:column;gap:9px"></div>`;
@@ -750,7 +754,9 @@ function closeCookbook(){document.getElementById('cookbook-overlay').style.displ
 function switchCbTab(tab){if(tab==='edit')beginCbEdit();cbTab=tab;document.querySelectorAll('.cb-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));renderCbTabBody();}
 function renderCookbook(){
   const r=cbRecipe;const ov=document.getElementById('cookbook-overlay');
-  const photo=r.photoUrl?`<img src="${r.photoUrl}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<div class="cb-cover-placeholder" style="background:${catPlateColors[r.cat]}">${r.emoji}</div>`;
+  const photo=r.photoUrl
+    ?`<img src="${r.photoUrl}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.background='var(--paper3)';this.remove()">`
+    :`<div class="cb-cover-placeholder" style="background:${catPlateColors[r.cat]}"></div>`;
   ov.innerHTML=`<div class="cookbook-topbar"><div class="back-link" onclick="closeCookbook()"><i class="ti ti-arrow-left"></i> Back to library</div><div class="cookbook-actions"><button class="made-this-btn" onclick="openMadeThisModal()"><i class="ti ti-check"></i> I made this</button></div></div>
     <div class="cookbook-scroll"><div class="cookbook-page">
       <div class="cb-header"><div class="cb-cover-photo">${photo}<button class="cb-photo-change-btn" onclick="openPhotoChanger()"><i class="ti ti-camera"></i> Change photo</button></div>
@@ -917,7 +923,7 @@ async function sendDiscover(prefill){
       const r=result.recipe;const photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent(r.photoSearchQuery||r.name+' food')}`;
       am.className='msg ai';am.textContent=result.search_description||`Found: ${r.name}`;
       const card=document.createElement('div');card.className='discover-recipe-card';
-      card.innerHTML=`<div class="drc-photo"><img src="${photoUrl}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.innerHTML='<div class=drc-photo-placeholder>${r.emoji}</div>'"></div><div class="drc-body"><div class="drc-title">${r.name}</div><div class="drc-meta"><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span> &nbsp;${r.time} &middot; ${r.baseServings} servings</div><div class="drc-ings">${(r.ingredients||[]).slice(0,5).map(i=>i.name).join(', ')}${r.ingredients&&r.ingredients.length>5?' &amp; more':''}</div><div class="drc-actions"><button class="btn-primary" style="flex:1;font-size:11px;justify-content:center" onclick="saveDiscoveredRecipe(this)">Save to library</button><button class="btn-ghost" style="font-size:11px" onclick="this.closest('.discover-recipe-card').remove()">Keep looking</button></div></div>`;
+      card.innerHTML=`<div class="drc-photo"><img src="${photoUrl}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.background='var(--paper3)';this.remove()"></div><div class="drc-body"><div class="drc-title">${r.name}</div><div class="drc-meta"><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span> &nbsp;${r.time} &middot; ${r.baseServings} servings</div><div class="drc-ings">${(r.ingredients||[]).slice(0,5).map(i=>i.name).join(', ')}${r.ingredients&&r.ingredients.length>5?' &amp; more':''}</div><div class="drc-actions"><button class="btn-primary" style="flex:1;font-size:11px;justify-content:center" onclick="saveDiscoveredRecipe(this)">Save to library</button><button class="btn-ghost" style="font-size:11px" onclick="this.closest('.discover-recipe-card').remove()">Keep looking</button></div></div>`;
       card.dataset.recipe=JSON.stringify({...r,photoUrl});chat.appendChild(card);
     }else{am.className='msg ai';am.textContent=result.message||"Couldn't find a great match. Try describing differently.";}
   }catch(e){am.className='msg ai';am.textContent='Something went wrong. Try again.';}
@@ -925,39 +931,76 @@ async function sendDiscover(prefill){
 }
 async function saveDiscoveredRecipe(btn){
   const card=btn.closest('.discover-recipe-card');const raw=JSON.parse(card.dataset.recipe);
-  const newRecipe={id:Date.now(),name:raw.name,cat:raw.category,emoji:raw.emoji||'\u{1F37D}',src:'url',time:raw.time,baseServings:raw.baseServings||2,timeMade:0,rating:0,notes:'',tags:raw.tags||[],profiles:[],edits:[],photoUrl:raw.photoUrl||'',sourceLabel:'Discovered via Mise',ings:(raw.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:raw.steps||[]};
+  const newRecipe={id:Date.now(),name:raw.name,cat:raw.category,src:'url',time:raw.time,baseServings:raw.baseServings||2,timeMade:0,rating:0,notes:'',tags:raw.tags||[],profiles:[],edits:[],photoUrl:raw.photoUrl||'',sourceLabel:'Discovered via Rish',ings:(raw.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:raw.steps||[]};
   recipes.push(newRecipe);
   filterRecipes(document.getElementById('search-inp').value);
   card.innerHTML=`<div style="padding:14px 12px;font-size:12px;color:var(--success);display:flex;align-items:center;gap:8px"><i class="ti ti-check" style="font-size:16px"></i> Saved to your library!</div>`;
   setTimeout(()=>card.remove(),2000);showToast(`${raw.name} saved!`);
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
-let importMode=null,screenshotQueue=[],pendingImageData=null,importCtx='';
+let importMode=null,screenshotQueue=[],pendingImageData=null,pendingPdfData=null,importCtx='';
 const EXTRACT_PROMPT=`Extract the recipe from the provided source(s) and return ONLY valid JSON (no markdown):
-{"name":"...","category":"breakfast|lunch|dinner|snack|dessert","emoji":"single emoji","time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"photoSearchQuery":"descriptive phrase for a food photo search","sourceLabel":"website name, URL, or logo text visible in the image — e.g. 'seriouseats.com' or 'Ottolenghi'. Leave empty string if none visible.","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
-If multiple images are provided, compile them into one complete recipe. Look for any visible website address, domain name, publication name, or brand logo and put it in sourceLabel. Auto-generate 2-3 relevant tags. Return valid JSON only.`;
+{"name":"...","category":"breakfast|lunch|dinner|snack|dessert","time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"photoSearchQuery":"very specific food photography phrase for this exact dish — e.g. 'seared salmon fillet sesame rice bowl overhead' or 'dark chocolate lava cake molten centre white plate'. Specific enough to find a real photo of THIS dish.","sourceLabel":"any visible website, URL, publication name or brand — e.g. 'seriouseats.com' or 'Ottolenghi'. Empty string if none.","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
+If multiple images/pages, compile into one complete recipe. Identify any visible source. Auto-generate 2-3 relevant tags. Return valid JSON only.`;
 function setImportMode(mode,ctx){
-  importMode=mode;importCtx=ctx||'';screenshotQueue=[];pendingImageData=null;
+  importMode=mode;importCtx=ctx||'';screenshotQueue=[];pendingImageData=null;pendingPdfData=null;
   const sfx=importCtx?'-'+importCtx:'';
   document.getElementById('import-mode-select'+sfx).style.display='none';
   const area=document.getElementById('import-input-area'+sfx);area.style.display='flex';document.getElementById('import-result-area'+sfx).style.display='none';
   if(mode==='screenshots'){
     area.innerHTML=`<div class="section-lbl">Add screenshots (multiple OK)</div><div style="font-size:11px;color:var(--ink3);margin-bottom:8px;line-height:1.5">Add all screenshots of the recipe &mdash; Claude compiles them into one.</div><div class="screenshot-queue" id="sq-row"><div class="sq-add" onclick="document.getElementById('sq-file-inp').click()">+</div></div><input type="file" id="sq-file-inp" accept="image/*" multiple style="display:none" onchange="addScreenshots(this)"><div id="sq-count" style="font-size:11px;color:var(--ink4);margin-top:4px"></div><button class="btn-primary" id="sq-extract-btn" style="display:none;width:100%;margin-top:4px" onclick="extractFromScreenshots()"><i class="ti ti-sparkles"></i> Compile recipe from screenshots</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
   }else if(mode==='photo'){
-    area.innerHTML=`<div class="section-lbl">Upload a photo</div><div class="drop-zone" id="drop-z" onclick="document.getElementById('file-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleImgDrop(event)"><i class="ti ti-camera" style="font-size:20px;color:var(--ink4);display:block;margin-bottom:6px"></i><div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop image or click to browse</div><div style="font-size:11px;color:var(--ink4)">JPG, PNG, HEIC</div></div><input type="file" id="file-inp" accept="image/*" style="display:none" onchange="handleFileSelect(this)"><div id="img-preview" style="display:none"></div><button class="btn-primary" id="parse-img-btn" style="display:none;width:100%" onclick="parseImage()">Extract recipe &rarr;</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
+    area.innerHTML=`<div class="section-lbl">Upload a photo of the dish</div><div class="drop-zone" id="drop-z" onclick="document.getElementById('file-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleImgDrop(event)"><i class="ti ti-camera" style="font-size:20px;color:var(--ink4);display:block;margin-bottom:6px"></i><div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop image or click to browse</div><div style="font-size:11px;color:var(--ink4)">JPG, PNG, HEIC</div></div><input type="file" id="file-inp" accept="image/*" style="display:none" onchange="handleFileSelect(this)"><div id="img-preview" style="display:none"></div><button class="btn-primary" id="parse-img-btn" style="display:none;width:100%" onclick="parseImage()">Extract recipe &rarr;</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
+  }else if(mode==='pdf'){
+    area.innerHTML=`<div class="section-lbl">Upload a PDF</div><div class="drop-zone" id="pdf-drop-z" onclick="document.getElementById('pdf-file-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handlePdfDrop(event)"><i class="ti ti-file-type-pdf" style="font-size:22px;color:var(--ink4);display:block;margin-bottom:6px"></i><div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop PDF or click to browse</div><div style="font-size:11px;color:var(--ink4)">Recipe book pages, printed recipes</div></div><input type="file" id="pdf-file-inp" accept="application/pdf" style="display:none" onchange="handlePdfSelect(this)"><div id="pdf-preview" style="display:none;font-size:12px;color:var(--ink3);padding:8px 0;display:flex;align-items:center;gap:8px"></div><button class="btn-primary" id="parse-pdf-btn" style="display:none;width:100%" onclick="parsePdf()"><i class="ti ti-sparkles"></i> Extract recipe &rarr;</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
   }else if(mode==='url'){
     area.innerHTML=`<div class="section-lbl">Paste a recipe URL</div><div class="url-row"><input type="text" id="url-inp" placeholder="https://&hellip;"><button class="btn-primary" onclick="parseUrl()">Extract</button></div><div style="font-size:11px;color:var(--ink4)">Any recipe website works.</div><button class="btn-ghost" style="width:100%;text-align:center;margin-top:4px" onclick="resetImport()">&larr; Back</button>`;
   }else{
     area.innerHTML=`<div class="section-lbl">Paste or type a recipe</div><textarea class="paste-area" id="text-inp" placeholder="Paste any recipe text &mdash; Claude will structure it."></textarea><button class="btn-primary" style="width:100%" onclick="parseText()">Structure recipe &rarr;</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
   }
 }
-function addScreenshots(inp){Array.from(inp.files).forEach(file=>{const reader=new FileReader();reader.onload=e=>{screenshotQueue.push({dataUrl:e.target.result,name:file.name});renderScreenshotQueue();};reader.readAsDataURL(file);});inp.value='';}
+function addScreenshots(inp){Array.from(inp.files).forEach(file=>{const reader=new FileReader();reader.onload=e=>{screenshotQueue.push({dataUrl:e.target.result,name:file.name,type:file.type});renderScreenshotQueue();};reader.readAsDataURL(file);});inp.value='';}
 function renderScreenshotQueue(){const row=document.getElementById('sq-row');if(!row)return;row.innerHTML=screenshotQueue.map((img,i)=>`<div class="sq-thumb"><img src="${img.dataUrl}" alt="screenshot ${i+1}"><div class="sq-del" onclick="removeScreenshot(${i})">&times;</div></div>`).join('')+`<div class="sq-add" onclick="document.getElementById('sq-file-inp').click()">+</div>`;const cnt=document.getElementById('sq-count');if(cnt)cnt.textContent=screenshotQueue.length>0?`${screenshotQueue.length} screenshot${screenshotQueue.length>1?'s':''} queued`:'';const btn=document.getElementById('sq-extract-btn');if(btn)btn.style.display=screenshotQueue.length>0?'block':'none';}
 function removeScreenshot(i){screenshotQueue.splice(i,1);renderScreenshotQueue();}
-async function extractFromScreenshots(){if(!screenshotQueue.length)return;showProcessing(`Compiling recipe from ${screenshotQueue.length} screenshot${screenshotQueue.length>1?'s':''}\u2026`);const content=screenshotQueue.map(img=>({type:'image',source:{type:'base64',media_type:img.dataUrl.split(';')[0].split(':')[1],data:img.dataUrl.split(',')[1]}}));content.push({type:'text',text:EXTRACT_PROMPT});await callExtract([{role:'user',content}]);}
+async function extractFromScreenshots(){
+  if(!screenshotQueue.length)return;
+  showProcessing(`Compiling recipe from ${screenshotQueue.length} screenshot${screenshotQueue.length>1?'s':''}\u2026`);
+  const content=screenshotQueue.map(img=>({type:'image',source:{type:'base64',media_type:img.type||img.dataUrl.split(';')[0].split(':')[1],data:img.dataUrl.split(',')[1]}}));
+  content.push({type:'text',text:EXTRACT_PROMPT});
+  // Stash the first screenshot as a candidate cover photo
+  pendingSourceImageData=screenshotQueue[0].dataUrl;
+  await callExtract([{role:'user',content}]);
+}
+
+// PDF handling
+function handlePdfDrop(e){e.preventDefault();document.getElementById('pdf-drop-z').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f&&f.type==='application/pdf')loadPdfFile(f);}
+function handlePdfSelect(inp){if(inp.files[0])loadPdfFile(inp.files[0]);}
+function loadPdfFile(file){
+  const reader=new FileReader();
+  reader.onload=e=>{
+    pendingPdfData=e.target.result;
+    const preview=document.getElementById('pdf-preview');
+    if(preview){preview.style.display='flex';preview.innerHTML=`<i class="ti ti-file-type-pdf" style="font-size:18px;color:var(--accent)"></i><span>${file.name} (${(file.size/1024).toFixed(0)} KB)</span>`;}
+    const btn=document.getElementById('parse-pdf-btn');if(btn)btn.style.display='block';
+    const dz=document.getElementById('pdf-drop-z');if(dz)dz.style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+async function parsePdf(){
+  if(!pendingPdfData)return;
+  showProcessing('Reading recipe from PDF\u2026');
+  const b64=pendingPdfData.split(',')[1];
+  await callExtract([{role:'user',content:[
+    {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+    {type:'text',text:EXTRACT_PROMPT}
+  ]}]);
+}
+// Stash source image data so we can use it as cover if it's a clean food photo
+let pendingSourceImageData=null;
+
 function handleImgDrop(e){e.preventDefault();document.getElementById('drop-z').classList.remove('drag-over');const f=e.dataTransfer.files[0];if(f&&f.type.startsWith('image/'))loadImgFile(f);}
 function handleFileSelect(inp){if(inp.files[0])loadImgFile(inp.files[0]);}
-function loadImgFile(file){const r=new FileReader();r.onload=e=>{pendingImageData=e.target.result;const pv=document.getElementById('img-preview');pv.style.display='block';pv.innerHTML=`<img src="${pendingImageData}" style="width:100%;border-radius:var(--r2);border:1px solid var(--paper3);max-height:120px;object-fit:cover">`;document.getElementById('parse-img-btn').style.display='block';document.getElementById('drop-z').style.display='none';};r.readAsDataURL(file);}
+function loadImgFile(file){const r=new FileReader();r.onload=e=>{pendingImageData=e.target.result;pendingSourceImageData=e.target.result;const pv=document.getElementById('img-preview');pv.style.display='block';pv.innerHTML=`<img src="${pendingImageData}" style="width:100%;border-radius:var(--r2);border:1px solid var(--paper3);max-height:120px;object-fit:cover">`;document.getElementById('parse-img-btn').style.display='block';document.getElementById('drop-z').style.display='none';};r.readAsDataURL(file);}
 async function parseImage(){if(!pendingImageData)return;showProcessing('Reading recipe from image\u2026');const b64=pendingImageData.split(',')[1],mt=pendingImageData.split(';')[0].split(':')[1];await callExtract([{role:'user',content:[{type:'image',source:{type:'base64',media_type:mt,data:b64}},{type:'text',text:EXTRACT_PROMPT}]}]);}
 let lastImportUrl='';
 async function parseUrl(){const url=document.getElementById('url-inp')?.value.trim()||document.getElementById('url-inp-m')?.value.trim()||'';if(!url)return;lastImportUrl=url;showProcessing('Extracting recipe\u2026');await callExtract([{role:'user',content:`${EXTRACT_PROMPT}\n\nURL: ${url}\n\nNote: invent a plausible recipe for that domain.`}]);}
@@ -971,14 +1014,27 @@ async function handleExtractResult(text){
   try{
     const r=JSON.parse(text.replace(/```json|```/g,'').trim());
     pendingExtractedRecipe=r;
-    const photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name)+' food recipe')}`;
-    r._photoUrl=photoUrl; // stash for save
+
+    // Photo strategy:
+    // - photo or screenshot import: use the source image directly as the cover
+    //   (it's already a picture of the dish or a page showing the dish)
+    // - PDF import: search Unsplash (PDFs are document pages, not food photos)
+    // - URL/text import: search Unsplash
+    let photoUrl='';
+    if((importMode==='photo'||importMode==='screenshots')&&pendingSourceImageData){
+      photoUrl=pendingSourceImageData; // use the actual uploaded image
+    } else {
+      // Search for a real food photo
+      photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name+' food dish recipe'))}`;
+    }
+    r._photoUrl=photoUrl;
+
     const sfx=importCtx?'-'+importCtx:'';
     const ra=document.getElementById('import-result-area'+sfx);
     const sourceHtml=r.sourceLabel?`<div style="font-size:11px;color:var(--ink4);font-style:italic;margin-top:4px">Source: ${r.sourceLabel}</div>`:'';
     ra.innerHTML=`<div class="section-lbl">Extracted &mdash; looks right?</div>
     <div class="result-card">
-      <div style="height:110px;overflow:hidden;border-radius:var(--r2) var(--r2) 0 0;background:var(--paper3)"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" alt="${r.name}" onerror="this.style.display='none'"></div>
+      <div style="height:110px;overflow:hidden;border-radius:var(--r2) var(--r2) 0 0;background:var(--paper3)"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" alt="${r.name}" onerror="this.parentNode.style.background='var(--paper3)'"></div>
       <div class="rc-body2">
         <div style="font-family:'Lora',serif;font-size:13px;font-weight:500;margin-bottom:3px">${r.name}</div>
         <span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span>
@@ -1012,7 +1068,9 @@ function previewExtractedRecipe(){
   // Render a preview-mode cookbook (no persist buttons, save/discard in topbar)
   const ov=document.getElementById('cookbook-overlay');
   ov.style.display='flex';
-  const photo=temp.photoUrl?`<img src="${temp.photoUrl}" alt="${temp.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`:`<div class="cb-cover-placeholder" style="background:${catPlateColors[temp.cat]}">${temp.emoji}</div>`;
+  const photo=temp.photoUrl
+    ?`<img src="${temp.photoUrl}" alt="${temp.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.background='var(--paper3)';this.remove()">`
+    :`<div class="cb-cover-placeholder" style="background:${catPlateColors[temp.cat]}"></div>`;
   ov.innerHTML=`<div class="cookbook-topbar">
     <div class="back-link" onclick="closePreviewCookbook()"><i class="ti ti-arrow-left"></i> Back to import</div>
     <div style="font-size:11px;color:var(--ink4);font-style:italic;margin-left:8px">Preview — not saved yet</div>
@@ -1044,20 +1102,20 @@ function closePreviewCookbook(){
 }
 function showImportError(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-result-area'+sfx).innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">${msg}</div><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Try again</button>`;}
 async function saveExtracted(r){
-  // Determine source info — r.sourceLabel may come from Claude's screenshot analysis
   let src='photo',sourceLabel=r.sourceLabel||'',sourceUrl='';
   if(importMode==='url'){src='url';sourceUrl=r.sourceUrl||lastImportUrl||'';if(!sourceLabel)sourceLabel=sourceUrl;}
   else if(importMode==='screenshots'){src='screenshot';if(!sourceLabel)sourceLabel='Imported from screenshots';}
   else if(importMode==='photo'){src='photo';if(!sourceLabel)sourceLabel='Imported from a photo';}
+  else if(importMode==='pdf'){src='manual';if(!sourceLabel)sourceLabel='Imported from PDF';}
   else{src='manual';if(!sourceLabel)sourceLabel='Added manually';}
   const photoUrl=r._photoUrl||r.photoUrl||`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name)+' food recipe')}`;
-  const newRecipe={id:Date.now(),name:r.name,cat:r.category,emoji:r.emoji||'\u{1F37D}',src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl,sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
-  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;showToast('Recipe saved!');
+  const newRecipe={id:Date.now(),name:r.name,cat:r.category,src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl,sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
+  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;showToast('Recipe saved!');
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
 function resetImport(){
   const sfx=importCtx?'-'+importCtx:'';
-  importMode=null;screenshotQueue=[];pendingImageData=null;
+  importMode=null;screenshotQueue=[];pendingImageData=null;pendingPdfData=null;pendingSourceImageData=null;
   const ms=document.getElementById('import-mode-select'+sfx);if(ms)ms.style.display='block';
   const ia=document.getElementById('import-input-area'+sfx);if(ia)ia.style.display='none';
   const ra=document.getElementById('import-result-area'+sfx);if(ra)ra.style.display='none';
