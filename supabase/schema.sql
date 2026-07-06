@@ -7,8 +7,8 @@
 create table if not exists recipes (
   id            uuid        primary key default gen_random_uuid(),
   name          text        not null,
-  cat           text        not null default 'dinner'
-                            check (cat in ('breakfast','lunch','dinner','snack','dessert')),
+  cats          text[]      not null default '{dinner}'
+
   emoji         text        not null default '🍽️',
   src           text        not null default 'manual'
                             check (src in ('photo','screenshot','url','manual')),
@@ -94,7 +94,7 @@ create policy "public read/write planner"
   on planner_slots for all using (true) with check (true);
 
 -- ── Seed data ─────────────────────────────────────────────────
-insert into recipes (name, cat, emoji, src, time, base_servings, time_made, rating, tags, profiles, photo_url, ings, steps)
+insert into recipes (name, cats, emoji, src, time, base_servings, time_made, rating, tags, profiles, photo_url, ings, steps)
 values
   (
     'Avocado toast with poached egg', 'breakfast', '🥑', 'manual', '15 min', 2, 8, 5,

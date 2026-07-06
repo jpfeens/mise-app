@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Middleware ────────────────────────────────────────────────
-app.use(express.json({ limit: '25mb' }));  // large enough for multiple base64 images
+app.use(express.json({ limit: '50mb' }));  // large enough for PDFs and multiple base64 images
 app.use(express.static(join(__dirname, 'public')));
 
 // ── Validate env on startup ───────────────────────────────────
@@ -47,6 +47,13 @@ app.post('/api/claude', async (req, res) => {
     return res.status(400).json({ error: 'messages array is required' });
   }
 
+  // Detect if any message contains a PDF document so we can add the beta header
+  const hasPdf = messages.some(m =>
+    Array.isArray(m.content) && m.content.some(b =>
+      b.type === 'document' && b.source?.media_type === 'application/pdf'
+    )
+  );
+
   const payload = {
     model:      model      || 'claude-sonnet-4-6',
     max_tokens: max_tokens || 1500,
@@ -55,15 +62,22 @@ app.post('/api/claude', async (req, res) => {
     ...(tools  && { tools  }),
   };
 
+  const headers = {
+    'Content-Type':      'application/json',
+    'x-api-key':         process.env.ANTHROPIC_API_KEY,
+    'anthropic-version': '2023-06-01',
+  };
+
+  // PDF support requires the beta header
+  if (hasPdf) {
+    headers['anthropic-beta'] = 'pdfs-2024-09-25';
+  }
+
   let anthropicRes;
   try {
     anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: {
-        'Content-Type':      'application/json',
-        'x-api-key':         process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
+      headers,
       body: JSON.stringify(payload),
     });
   } catch (err) {
