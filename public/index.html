@@ -944,7 +944,7 @@ async function saveDiscoveredRecipe(btn){
 }
 let importMode=null,screenshotQueue=[],pendingImageData=null,pendingPdfData=null,importCtx='';
 const EXTRACT_PROMPT=`Extract the recipe from the provided source(s) and return ONLY valid JSON (no markdown):
-{"name":"...","categories":["dinner"],"time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"photoSearchQuery":"very specific food photography phrase for this exact dish — e.g. 'seared salmon fillet sesame rice bowl overhead' or 'dark chocolate lava cake molten centre white plate'. Specific enough to find a real photo of THIS dish.","sourceLabel":"any visible website, URL, publication name or brand — e.g. 'seriouseats.com' or 'Ottolenghi'. Empty string if none.","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
+{"name":"...","categories":["dinner"],"time":"e.g. 30 min","baseServings":4,"tags":["quick","asian"],"sourceLabel":"any visible website, URL, publication name or brand — e.g. 'seriouseats.com' or 'Ottolenghi'. Empty string if none.","ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}
 categories is an array — include all that apply from: breakfast, lunch, dinner, snack, dessert. If multiple apply (e.g. works as lunch or dinner), include both. If multiple images/pages, compile into one complete recipe. Identify any visible source. Auto-generate 2-3 relevant tags. Return valid JSON only.`;
 function setImportMode(mode,ctx){
   importMode=mode;importCtx=ctx||'';screenshotQueue=[];pendingImageData=null;pendingPdfData=null;
@@ -1035,33 +1035,20 @@ async function handleExtractResult(text){
   try{
     const r=JSON.parse(text.replace(/```json|```/g,'').trim());
     pendingExtractedRecipe=r;
+    r._photoUrl=''; // no photo on import — user can add one later via Change photo
 
-    // Photo strategy:
-    // - Single photo import only: the uploaded image IS the dish — use directly
-    // - Screenshots, PDF, URL, text: source is a recipe page not a food photo — use Unsplash
-    let photoUrl='';
-    const seed=Date.now()%10000;
-    if(importMode==='photo'&&pendingSourceImageData){
-      photoUrl=pendingSourceImageData;
-    } else {
-      const q=encodeURIComponent((r.photoSearchQuery||r.name+' food dish').trim());
-      photoUrl=`https://source.unsplash.com/400x300/?${q}&sig=${seed}`;
-    }
-    r._photoUrl=photoUrl;
-
+    const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
     const sfx=importCtx?'-'+importCtx:'';
     const ra=document.getElementById('import-result-area'+sfx);
     const sourceHtml=r.sourceLabel?`<div style="font-size:11px;color:var(--ink4);font-style:italic;margin-top:4px">Source: ${r.sourceLabel}</div>`:'';
     ra.innerHTML=`<div class="section-lbl">Extracted &mdash; looks right?</div>
     <div class="result-card">
-      <div style="height:110px;overflow:hidden;border-radius:var(--r2) var(--r2) 0 0;background:var(--paper3)"><img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover" alt="${r.name}" onerror="this.parentNode.style.background='var(--paper3)'"></div>
-      <div class="rc-body2">
-        <div style="font-family:'Lora',serif;font-size:13px;font-weight:500;margin-bottom:3px">${r.name}</div>
-        <span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span>
-        <span style="font-size:11px;color:var(--ink4);margin-left:5px">${r.time} &middot; ${r.baseServings||2} servings</span>
-        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:5px">${(r.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+      <div class="rc-body2" style="padding:12px">
+        <div style="font-family:'Lora',serif;font-size:14px;font-weight:500;margin-bottom:5px">${r.name}</div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">${cats.map(c=>`<span class="cat-pill ${catPills[c]||'cpd'}">${c}</span>`).join('')}<span style="font-size:11px;color:var(--ink4);align-self:center;margin-left:2px">${r.time} &middot; ${r.baseServings||2} servings</span></div>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">${(r.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
         ${sourceHtml}
-        <div style="display:flex;gap:6px;margin-top:10px">
+        <div style="display:flex;gap:6px;margin-top:12px">
           <button class="btn-ghost" style="flex:1;justify-content:center" onclick="previewExtractedRecipe()"><i class="ti ti-eye"></i> Preview</button>
           <button class="btn-primary" style="flex:1;justify-content:center" onclick="saveExtracted(pendingExtractedRecipe)"><i class="ti ti-check"></i> Save</button>
           <button class="btn-ghost" onclick="resetImport()">&times;</button>
@@ -1074,29 +1061,30 @@ async function handleExtractResult(text){
 // Opens a temporary cookbook overlay for a not-yet-saved recipe
 function previewExtractedRecipe(){
   if(!pendingExtractedRecipe)return;
+  // On mobile the import is inside a bottom sheet — close it so the overlay is visible
+  closeMobileSheet();
   const r=pendingExtractedRecipe;
-  // Build a temporary recipe object in the shape openCookbook expects
+  const primaryCat=(r.categories&&r.categories[0])||(r.category)||'dinner';
+  const cats=r.categories&&r.categories.length?r.categories:[primaryCat];
   const temp={
-    id:'__preview__', name:r.name, cats:r.categories&&r.categories.length?r.categories:[r.category||'dinner'],
+    id:'__preview__', name:r.name, cats,
     src:'screenshot', time:r.time, baseServings:r.baseServings||2,
     timeMade:0, rating:0, notes:'', tags:r.tags||[], profiles:[], edits:[],
-    photoUrl:r._photoUrl||'', sourceLabel:r.sourceLabel||'',
+    photoUrl:'', sourceLabel:r.sourceLabel||'',
     ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),
     steps:r.steps||[]
   };
   cbRecipe=temp;cbServings=temp.baseServings;cbTab='recipe';cbCheckedIngs=new Set();
-  // Render a preview-mode cookbook (no persist buttons, save/discard in topbar)
   const ov=document.getElementById('cookbook-overlay');
   ov.style.display='flex';
-  const photo=temp.photoUrl
-    ?`<img src="${temp.photoUrl}" alt="${temp.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.background='var(--paper3)';this.remove()">`
-    :`<div class="cb-cover-placeholder" style="background:${catPlateColors[temp.cat]}"></div>`;
+  const primaryColor=catPlateColors[primaryCat]||catPlateColors['dinner'];
+  const photo=`<div class="cb-cover-placeholder" style="background:${primaryColor}"></div>`;
   ov.innerHTML=`<div class="cookbook-topbar">
     <div class="back-link" onclick="closePreviewCookbook()"><i class="ti ti-arrow-left"></i> Back to import</div>
-    <div style="font-size:11px;color:var(--ink4);font-style:italic;margin-left:8px">Preview — not saved yet</div>
+    <div style="font-size:11px;color:var(--ink4);font-style:italic;margin-left:8px;flex:1">Preview — not saved</div>
     <div class="cookbook-actions">
       <button class="btn-ghost" onclick="closePreviewCookbook();resetImport()">Discard</button>
-      <button class="made-this-btn" style="background:var(--accent)" onclick="closePreviewCookbook();saveExtracted(pendingExtractedRecipe)"><i class="ti ti-check"></i> Save to library</button>
+      <button class="made-this-btn" style="background:var(--accent)" onclick="saveFromPreview()"><i class="ti ti-check"></i> Save to library</button>
     </div>
   </div>
   <div class="cookbook-scroll"><div class="cookbook-page">
@@ -1114,6 +1102,13 @@ function previewExtractedRecipe(){
   renderCbRecipeBody();
 }
 
+// Save from preview — closes overlay cleanly without trying to re-open import sheet
+function saveFromPreview(){
+  if(!pendingExtractedRecipe)return;
+  closePreviewCookbook();
+  saveExtracted(pendingExtractedRecipe);
+}
+
 function closePreviewCookbook(){
   const ov=document.getElementById('cookbook-overlay');
   ov.style.display='none';
@@ -1122,16 +1117,15 @@ function closePreviewCookbook(){
 }
 function showImportError(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-result-area'+sfx).innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">${msg}</div><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Try again</button>`;}
 async function saveExtracted(r){
-  let src='photo',sourceLabel=r.sourceLabel||'',sourceUrl='';
-  if(importMode==='url'){src='url';sourceUrl=r.sourceUrl||lastImportUrl||'';if(!sourceLabel)sourceLabel=sourceUrl;}
+  let src='manual',sourceLabel=r.sourceLabel||'',sourceUrl='';
+  if(importMode==='url'){src='url';sourceUrl=lastImportUrl||'';if(!sourceLabel)sourceLabel=sourceUrl;}
   else if(importMode==='screenshots'){src='screenshot';if(!sourceLabel)sourceLabel='Imported from screenshots';}
   else if(importMode==='photo'){src='photo';if(!sourceLabel)sourceLabel='Imported from a photo';}
   else if(importMode==='pdf'){src='manual';if(!sourceLabel)sourceLabel='Imported from PDF';}
   else{src='manual';if(!sourceLabel)sourceLabel='Added manually';}
   const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
-  const photoUrl=r._photoUrl||r.photoUrl||`https://source.unsplash.com/400x300/?${encodeURIComponent((r.photoSearchQuery||r.name)+' food recipe')}`;
-  const newRecipe={id:Date.now(),name:r.name,cats,src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl,sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
-  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;showToast('Recipe saved!');
+  const newRecipe={id:Date.now(),name:r.name,cats,src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:'',sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
+  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;showToast('Recipe saved! Tap the photo area to add a cover image.');
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
 function resetImport(){
