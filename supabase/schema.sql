@@ -25,6 +25,7 @@ create table if not exists recipes (
   photo_url     text        default '',   -- real food photo URL
   source_label  text        default '',   -- human-readable source credit
   source_url    text        default '',   -- original URL if imported from web
+  macros        jsonb       default null, -- {kcal,protein_g,carbs_g,fat_g,note}
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 );

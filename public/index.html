@@ -263,7 +263,12 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
 .emoji-custom-row input{flex:1;padding:6px 9px;border:1px solid var(--paper3);border-radius:var(--r);font-size:16px;text-align:center;font-family:'Inter',sans-serif}
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{animation:spin 1s linear infinite;display:inline-block}
-/* source credit line in cookbook */
+/* macros row in cookbook */
+.cb-macros{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;padding:10px 14px;background:var(--paper2);border-radius:var(--r2);border:1px solid var(--rule)}
+.cb-macro{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:52px}
+.cb-macro-val{font-size:14px;font-weight:600;color:var(--ink);font-family:'Lora',serif}
+.cb-macro-lbl{font-size:10px;color:var(--ink4);text-transform:uppercase;letter-spacing:.04em}
+.cb-macro-note{font-size:10px;color:var(--ink4);font-style:italic;margin-top:6px;width:100%}
 .cb-source-credit{font-size:11.5px;color:var(--ink4);font-style:italic;margin-top:28px;padding-top:16px;border-top:1px solid var(--rule)}
 .cb-source-credit a{color:var(--ink4);text-decoration:underline}
 
@@ -485,6 +490,7 @@ function rowToRecipe(row){
     tags:row.tags||[], profiles:row.profiles||[], edits:row.edits||[],
     photoUrl:row.photo_url||'',
     sourceLabel:row.source_label||'', sourceUrl:row.source_url||'',
+    macros:row.macros||null,
     ings:row.ings||[], steps:row.steps||[]
   };
 }
@@ -498,6 +504,7 @@ function recipeToRow(r){
     tags:r.tags||[], profiles:r.profiles||[], edits:r.edits||[],
     photo_url:r.photoUrl||'',
     source_label:r.sourceLabel||'', source_url:r.sourceUrl||'',
+    macros:r.macros||null,
     ings:r.ings||[], steps:r.steps||[]
   };
 }
@@ -530,6 +537,7 @@ function persistRecipe(id, fields){
   const row={};
   if('name' in fields)row.name=fields.name;
   if('cats' in fields)row.cats=fields.cats;
+  if('macros' in fields)row.macros=fields.macros;
   if('emoji' in fields)row.emoji=fields.emoji;
   if('time' in fields)row.time=fields.time;
   if('baseServings' in fields)row.base_servings=fields.baseServings;
@@ -777,7 +785,23 @@ function renderCbRecipeBody(){
   const r=cbRecipe;const ratio=cbServings/r.baseServings,changed=cbServings!==r.baseServings;
   const ings=r.ings.map((ing,i)=>{const amt=fmtAmt(ing,ratio),chk=cbCheckedIngs.has(i);return`<div class="cb-ing-row"><div class="cb-ing-check ${chk?'checked':''}" onclick="toggleCbIngCheck(${i})">${chk?'<i class="ti ti-check"></i>':''}</div><span class="cb-ing-amt ${changed&&ing.qty!=null?'changed':''}">${amt}</span><span style="flex:1;font-size:13.5px;color:var(--ink2)">${ing.name}</span></div>`;}).join('');
   const steps=r.steps.map((s,i)=>{const edit=r.edits&&r.edits.find(e=>e.step===i);const sc=edit?`<span class="cb-edit-wrap"><span class="cb-original-text">${edit.original}<svg class="cb-strike" viewBox="0 0 100 8" preserveAspectRatio="none"><path d="M0,4 Q20,1 40,5 Q65,8 80,3 Q90,1 100,4" fill="none" stroke="#8b5e3c" stroke-width="2" stroke-linecap="round"/></svg></span><span class="cb-handwrite">${edit.edit}</span></span>`:s;return`<div class="cb-step"><div class="cb-step-num">${String(i+1).padStart(2,'0')}</div><div class="cb-step-text">${sc}</div></div>`;}).join('');
-  document.getElementById('cb-recipe-body').innerHTML=`<div class="cb-two-col"><div class="cb-ingredients-col"><div class="cb-section-title"><i class="ti ti-list"></i> Ingredients</div><div class="cb-scaler"><div class="cb-scaler-row"><span style="font-size:12px;color:var(--ink3);flex:1">Servings</span><button class="cb-scaler-btn" onclick="changeCbServings(-1)">&minus;</button><span class="cb-scaler-val">${cbServings}</span><button class="cb-scaler-btn" onclick="changeCbServings(1)">+</button></div><div style="font-size:10px;color:var(--ink4);margin-top:5px">${changed?'Scaled from '+r.baseServings:'Original recipe'}</div></div><div>${ings}</div><button class="btn-primary" style="margin-top:14px;width:100%;justify-content:center" onclick="addSelectedToGrocery()"><i class="ti ti-shopping-cart"></i> Add selected to grocery</button><div style="font-size:10px;color:var(--ink4);margin-top:6px;text-align:center">Check items you need, or leave unchecked to add all.</div></div><div><div class="cb-section-title"><i class="ti ti-tools-kitchen-2"></i> Method</div><div class="cb-steps-list">${steps}</div></div></div>`;
+  // Macros block
+  let macrosHtml='';
+  if(r.macros){
+    const m=r.macros;
+    macrosHtml=`<div class="cb-macros">
+      <div class="cb-macro"><span class="cb-macro-val">${Math.round((m.kcal||0)*ratio)}</span><span class="cb-macro-lbl">kcal</span></div>
+      <div class="cb-macro"><span class="cb-macro-val">${Math.round((m.protein_g||0)*ratio)}g</span><span class="cb-macro-lbl">protein</span></div>
+      <div class="cb-macro"><span class="cb-macro-val">${Math.round((m.carbs_g||0)*ratio)}g</span><span class="cb-macro-lbl">carbs</span></div>
+      <div class="cb-macro"><span class="cb-macro-val">${Math.round((m.fat_g||0)*ratio)}g</span><span class="cb-macro-lbl">fat</span></div>
+      ${m.note?`<div class="cb-macro-note">\u2139\ufe0f ${m.note}</div>`:''}
+    </div>`;
+  } else if(r.id&&r.id!=='__preview__'){
+    macrosHtml=`<div class="cb-macros" style="cursor:pointer" onclick="estimateMacros(${JSON.stringify(r.id)});this.innerHTML='<span style=font-size:12px;color:var(--ink4)>Estimating\u2026</span>'">
+      <span style="font-size:12px;color:var(--ink4)"><i class="ti ti-calculator"></i> Tap to estimate macros per serving</span>
+    </div>`;
+  }
+  document.getElementById('cb-recipe-body').innerHTML=`<div class="cb-two-col"><div class="cb-ingredients-col"><div class="cb-section-title"><i class="ti ti-list"></i> Ingredients</div><div class="cb-scaler"><div class="cb-scaler-row"><span style="font-size:12px;color:var(--ink3);flex:1">Servings</span><button class="cb-scaler-btn" onclick="changeCbServings(-1)">&minus;</button><span class="cb-scaler-val">${cbServings}</span><button class="cb-scaler-btn" onclick="changeCbServings(1)">+</button></div><div style="font-size:10px;color:var(--ink4);margin-top:5px">${changed?'Scaled from '+r.baseServings:'Original recipe'}</div></div><div>${ings}</div><button class="btn-primary" style="margin-top:14px;width:100%;justify-content:center" onclick="addSelectedToGrocery()"><i class="ti ti-shopping-cart"></i> Add selected to grocery</button><div style="font-size:10px;color:var(--ink4);margin-top:6px;text-align:center">Check items you need, or leave unchecked to add all.</div></div><div><div class="cb-section-title"><i class="ti ti-tools-kitchen-2"></i> Method</div><div class="cb-steps-list">${steps}</div></div></div>${macrosHtml}`;
 }
 function renderCbSourceLine(){
   const el=document.getElementById('cb-source-line');if(!el)return;
@@ -940,6 +964,7 @@ async function saveDiscoveredRecipe(btn){
   filterRecipes(document.getElementById('search-inp').value);
   card.innerHTML=`<div style="padding:14px 12px;font-size:12px;color:var(--success);display:flex;align-items:center;gap:8px"><i class="ti ti-check" style="font-size:16px"></i> Saved to your library!</div>`;
   setTimeout(()=>card.remove(),2000);showToast(`${raw.name} saved!`);
+  estimateMacros(newRecipe.id);
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
 let importMode=null,screenshotQueue=[],pendingImageData=null,pendingPdfData=null,importCtx='';
@@ -1125,11 +1150,46 @@ async function saveExtracted(r){
   else{src='manual';if(!sourceLabel)sourceLabel='Added manually';}
   const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
   const newRecipe={id:Date.now(),name:r.name,cats,src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:'',sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
-  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;showToast('Recipe saved! Tap the photo area to add a cover image.');
+  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;showToast('Recipe saved!');
+  // Background: fetch a food photo and estimate macros — both non-blocking
+  fetchRecipePhoto(newRecipe.id, newRecipe.name);
+  estimateMacros(newRecipe.id);
   try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
 }
+// Fetch a food photo from Unsplash in the background and update the recipe
+async function fetchRecipePhoto(recipeId, name){
+  try{
+    const q=encodeURIComponent(name.trim()+' food');
+    const sig=recipeId%99999||Date.now()%99999;
+    const url=`https://source.unsplash.com/400x300/?${q}&sig=${sig}`;
+    // Verify the image actually loads before committing
+    await new Promise((res,rej)=>{const img=new Image();img.onload=res;img.onerror=rej;img.src=url;});
+    const r=recipes.find(x=>x.id===recipeId);
+    if(r&&!r.photoUrl){r.photoUrl=url;persistRecipe(recipeId,{photoUrl:url});filterRecipes(document.getElementById('search-inp').value);}
+  }catch(e){/* silently ignore — no photo is fine */}
+}
+
+// Ask Claude to estimate macros per serving from the ingredient list
+async function estimateMacros(recipeId){
+  const r=recipes.find(x=>x.id===recipeId);
+  if(!r||!r.ings||!r.ings.length)return;
+  if(r.macros)return; // already have them
+  try{
+    const ingList=r.ings.map(i=>`${i.amt||''} ${i.name}`.trim()).join(', ');
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+      model:'claude-sonnet-4-6',max_tokens:200,
+      messages:[{role:'user',content:`Estimate nutritional values per serving for a recipe with ${r.baseServings} servings. Ingredients: ${ingList}. Return ONLY JSON: {"kcal":0,"protein_g":0,"carbs_g":0,"fat_g":0,"note":"brief caveat e.g. estimate only"}. Numbers as integers. No markdown.`}]
+    })});
+    const data=await res.json();
+    const text=data.content?.map(b=>b.text||'').join('')||'';
+    const macros=JSON.parse(text.replace(/```json|```/g,'').trim());
+    r.macros=macros;
+    persistRecipe(recipeId,{macros});
+    // Re-render cookbook if this recipe is open
+    if(cbRecipe&&cbRecipe.id===recipeId){cbRecipe.macros=macros;renderCookbook();}
+  }catch(e){/* silently ignore */}
+}
 function resetImport(){
-  const sfx=importCtx?'-'+importCtx:'';
   importMode=null;screenshotQueue=[];pendingImageData=null;pendingPdfData=null;pendingSourceImageData=null;
   const ms=document.getElementById('import-mode-select'+sfx);if(ms)ms.style.display='block';
   const ia=document.getElementById('import-input-area'+sfx);if(ia)ia.style.display='none';
