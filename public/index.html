@@ -401,7 +401,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <div class="sw"><i class="ti ti-search"></i><input type="text" placeholder="Search…" oninput="filterRecipes(this.value)" id="search-inp"></div>
       <button class="topbtn" onclick="navTo('import')"><i class="ti ti-plus"></i> Add</button>
       <div class="user-menu-wrap" id="user-menu-wrap" style="display:none">
-        <div class="user-menu-btn" onclick="toggleUserMenu()">
+        <div class="user-menu-btn" onclick="toggleUserMenu();event.stopPropagation()">
           <div class="user-avatar" id="user-avatar-initials">?</div>
           <span id="user-menu-name"></span>
           <i class="ti ti-chevron-down" style="font-size:10px"></i>
@@ -1580,8 +1580,20 @@ function updateUserUI(){
   document.getElementById('user-menu-name').textContent=name.split(' ')[0];
   document.getElementById('user-menu-wrap').style.display='flex';
 }
-function toggleUserMenu(forceClose=false){const dd=document.getElementById('user-dropdown');dd.style.display=(forceClose||dd.style.display==='flex')?'none':'flex';if(dd.style.display==='flex')dd.style.flexDirection='column';}
-document.addEventListener('click',e=>{const wrap=document.getElementById('user-menu-wrap');if(wrap&&!wrap.contains(e.target))toggleUserMenu(true);});
+function toggleUserMenu(forceClose=false){
+  const dd=document.getElementById('user-dropdown');
+  const open=dd.style.display==='flex';
+  if(forceClose||open){dd.style.display='none';}
+  else{dd.style.display='flex';dd.style.flexDirection='column';}
+}
+document.addEventListener('click',e=>{
+  const wrap=document.getElementById('user-menu-wrap');
+  // Only close if click is outside the menu wrap entirely
+  if(wrap&&!wrap.contains(e.target)){
+    const dd=document.getElementById('user-dropdown');
+    if(dd)dd.style.display='none';
+  }
+});
 function openAccountSettings(){toggleUserMenu(true);showToast('Account settings — coming soon');}
 function toggleRecipePrivacy(){
   if(!cbRecipe||!authToken)return;
