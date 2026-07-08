@@ -349,6 +349,25 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
 .auth-field input:focus{outline:none;border-color:var(--accent2)}
 .auth-err{font-size:12px;color:var(--danger);margin-bottom:10px;display:none}
 .auth-footer{font-size:11px;color:var(--ink4);text-align:center;margin-top:14px}
+/* ── Onboarding modal ── */
+.ob-backdrop{position:fixed;inset:0;background:rgba(26,24,20,.5);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)}
+.ob-modal{background:var(--paper);border-radius:var(--r3);box-shadow:0 20px 60px rgba(0,0,0,.18);width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
+.ob-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:24px 24px 0}
+.ob-title{font-family:'Lora',serif;font-size:20px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.ob-subtitle{font-size:12px;color:var(--ink4)}
+.ob-skip{border:none;background:none;font-size:12px;color:var(--ink4);cursor:pointer;padding:4px 8px;border-radius:var(--r);white-space:nowrap;flex-shrink:0;margin-top:2px}
+.ob-skip:hover{color:var(--ink);background:var(--paper3)}
+.ob-body{flex:1;overflow-y:auto;padding:20px 24px;display:flex;flex-direction:column;gap:22px}
+.ob-section{}
+.ob-section-label{font-size:12px;font-weight:600;color:var(--ink);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ob-section-desc{font-size:11px;color:var(--ink4);margin-bottom:8px;line-height:1.5}
+.ob-chips{display:flex;flex-wrap:wrap;gap:7px}
+.ob-chip{padding:7px 13px;border:1.5px solid var(--paper3);border-radius:99px;font-size:12px;cursor:pointer;color:var(--ink3);background:var(--paper);transition:all .12s;user-select:none}
+.ob-chip:hover{border-color:var(--ink4);color:var(--ink)}
+.ob-chip.selected{border-color:var(--accent);background:var(--accent-light);color:var(--ink);font-weight:500}
+.ob-footer{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:16px 24px;border-top:1px solid var(--rule);flex-shrink:0}
+.ob-skip-sm{border:none;background:none;font-size:12px;color:var(--ink4);cursor:pointer;padding:6px 12px}
+.ob-skip-sm:hover{color:var(--ink)}
 </style>
 </head>
 <body>
@@ -565,59 +584,66 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
   </div>
 </div>
 
-<!-- Onboarding screen -->
-<div class="onboard-screen" id="onboard-screen" style="display:none">
-  <div class="onboard-card">
-    <div class="onboard-progress">
-      <div class="onboard-dot active" id="ob-dot-0"></div>
-      <div class="onboard-dot" id="ob-dot-1"></div>
-      <div class="onboard-dot" id="ob-dot-2"></div>
-      <div class="onboard-dot" id="ob-dot-3"></div>
-    </div>
-    <div class="onboard-step active" id="ob-step-0">
-      <div class="onboard-title">Welcome to Rish 🍴</div>
-      <div class="onboard-sub">Let's set up your personal recipe library. It only takes a minute.</div>
-      <button class="btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="obNext()">Get started</button>
-    </div>
-    <div class="onboard-step" id="ob-step-1">
-      <div class="onboard-title">What's your diet?</div>
-      <div class="onboard-sub">We'll use this to personalise your starter recipes and Discover suggestions.</div>
-      <div class="onboard-grid" id="ob-diet-grid">
-        <div class="onboard-opt selected" data-val="omnivore" onclick="obSelect('diet',this)"><div class="onboard-opt-icon">🍽️</div><div class="onboard-opt-label">Omnivore</div><div class="onboard-opt-desc">Everything welcome</div></div>
-        <div class="onboard-opt" data-val="vegetarian" onclick="obSelect('diet',this)"><div class="onboard-opt-icon">🥦</div><div class="onboard-opt-label">Vegetarian</div><div class="onboard-opt-desc">No meat or fish</div></div>
-        <div class="onboard-opt" data-val="vegan" onclick="obSelect('diet',this)"><div class="onboard-opt-icon">🌱</div><div class="onboard-opt-label">Vegan</div><div class="onboard-opt-desc">No animal products</div></div>
-        <div class="onboard-opt" data-val="pescatarian" onclick="obSelect('diet',this)"><div class="onboard-opt-icon">🐟</div><div class="onboard-opt-label">Pescatarian</div><div class="onboard-opt-desc">Fish but no meat</div></div>
-        <div class="onboard-opt" data-val="keto" onclick="obSelect('diet',this)"><div class="onboard-opt-icon">🥩</div><div class="onboard-opt-label">Keto</div><div class="onboard-opt-desc">Low carb, high fat</div></div>
-        <div class="onboard-opt" data-val="paleo" onclick="obSelect('diet',this)"><div class="onboard-opt-icon">🥑</div><div class="onboard-opt-label">Paleo</div><div class="onboard-opt-desc">Whole unprocessed foods</div></div>
+<!-- Onboarding modal (shown over the app) -->
+<div class="ob-backdrop" id="onboard-screen" style="display:none">
+  <div class="ob-modal">
+    <div class="ob-header">
+      <div>
+        <div class="ob-title">Set up your profile</div>
+        <div class="ob-subtitle">Personalise your library — or skip and dive straight in.</div>
       </div>
-      <button class="btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="obNext()">Continue</button>
+      <button class="ob-skip" onclick="obSkip()">Skip for now</button>
     </div>
-    <div class="onboard-step" id="ob-step-2">
-      <div class="onboard-title">Who are you cooking for?</div>
-      <div class="onboard-sub">This helps suggest recipes with the right serving sizes.</div>
-      <div class="onboard-grid" id="ob-household-grid">
-        <div class="onboard-opt" data-val="solo" onclick="obSelect('household',this)"><div class="onboard-opt-icon">🧑</div><div class="onboard-opt-label">Just me</div><div class="onboard-opt-desc">1–2 servings</div></div>
-        <div class="onboard-opt" data-val="couple" onclick="obSelect('household',this)"><div class="onboard-opt-icon">👫</div><div class="onboard-opt-label">Couple</div><div class="onboard-opt-desc">2 servings</div></div>
-        <div class="onboard-opt selected" data-val="family" onclick="obSelect('household',this)"><div class="onboard-opt-icon">👨‍👩‍👧‍👦</div><div class="onboard-opt-label">Family</div><div class="onboard-opt-desc">3–5 servings</div></div>
-        <div class="onboard-opt" data-val="large" onclick="obSelect('household',this)"><div class="onboard-opt-icon">🎉</div><div class="onboard-opt-label">Large household</div><div class="onboard-opt-desc">6+ people</div></div>
-      </div>
-      <button class="btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="obNext()">Continue</button>
-    </div>
-    <div class="onboard-step" id="ob-step-3">
-      <div class="onboard-title">Start your library</div>
-      <div class="onboard-sub">We've curated starter recipes matched to your diet. You can always delete or add your own.</div>
-      <div style="display:flex;flex-direction:column;gap:9px;margin-bottom:18px">
-        <div class="onboard-opt selected" id="ob-starter-yes" onclick="obSelectStarter('yes')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">🌟</span><div><div class="onboard-opt-label">Give me starter recipes</div><div class="onboard-opt-desc">10 curated recipes matched to your diet</div></div></div></div>
-        <div class="onboard-opt" id="ob-starter-no" onclick="obSelectStarter('no')"><div style="display:flex;align-items:center;gap:10px"><span style="font-size:20px">📭</span><div><div class="onboard-opt-label">Start with an empty library</div><div class="onboard-opt-desc">Import or discover recipes yourself</div></div></div></div>
-      </div>
-      <div style="border-top:1px solid var(--rule);padding-top:14px;margin-bottom:18px">
-        <div style="font-size:12px;font-weight:500;margin-bottom:8px">Recipe privacy default</div>
-        <div style="display:flex;flex-direction:column;gap:7px">
-          <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer"><input type="radio" name="ob-privacy" value="private" checked id="ob-priv-private" style="margin-top:2px"><div><div style="font-size:12px;font-weight:500">Private by default</div><div style="font-size:11px;color:var(--ink4)">Only you can see your recipes. Share individual ones any time.</div></div></label>
-          <label style="display:flex;align-items:flex-start;gap:9px;cursor:pointer"><input type="radio" name="ob-privacy" value="public" id="ob-priv-public" style="margin-top:2px"><div><div style="font-size:12px;font-weight:500">Public by default</div><div style="font-size:11px;color:var(--ink4)">Your recipes contribute to the community library.</div></div></label>
+    <div class="ob-body">
+
+      <!-- Diet -->
+      <div class="ob-section">
+        <div class="ob-section-label"><i class="ti ti-salad"></i> What's your diet?</div>
+        <div class="ob-chips" id="ob-diet-chips">
+          <div class="ob-chip selected" data-val="omnivore" onclick="obChip('diet',this)">🍽️ Omnivore</div>
+          <div class="ob-chip" data-val="vegetarian" onclick="obChip('diet',this)">🥦 Vegetarian</div>
+          <div class="ob-chip" data-val="vegan" onclick="obChip('diet',this)">🌱 Vegan</div>
+          <div class="ob-chip" data-val="pescatarian" onclick="obChip('diet',this)">🐟 Pescatarian</div>
+          <div class="ob-chip" data-val="keto" onclick="obChip('diet',this)">🥩 Keto</div>
+          <div class="ob-chip" data-val="paleo" onclick="obChip('diet',this)">🥑 Paleo</div>
         </div>
       </div>
-      <button class="btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="obFinish()" id="ob-finish-btn">Let's cook 🍴</button>
+
+      <!-- Household -->
+      <div class="ob-section">
+        <div class="ob-section-label"><i class="ti ti-users"></i> Who are you cooking for?</div>
+        <div class="ob-chips" id="ob-household-chips">
+          <div class="ob-chip" data-val="solo" onclick="obChip('household',this)">🧑 Just me</div>
+          <div class="ob-chip" data-val="couple" onclick="obChip('household',this)">👫 Couple</div>
+          <div class="ob-chip selected" data-val="family" onclick="obChip('household',this)">👨‍👩‍👧‍👦 Family</div>
+          <div class="ob-chip" data-val="large" onclick="obChip('household',this)">🎉 Large household</div>
+        </div>
+      </div>
+
+      <!-- Starter recipes -->
+      <div class="ob-section">
+        <div class="ob-section-label"><i class="ti ti-books"></i> Start with starter recipes?</div>
+        <div class="ob-section-desc">We'll add 10 curated recipes matched to your diet and serving size. You can delete any you don't want.</div>
+        <div class="ob-chips" id="ob-starter-chips">
+          <div class="ob-chip selected" data-val="yes" onclick="obChip('starterRecipes',this)">🌟 Yes please</div>
+          <div class="ob-chip" data-val="no" onclick="obChip('starterRecipes',this)">📭 Start empty</div>
+        </div>
+      </div>
+
+      <!-- Privacy -->
+      <div class="ob-section">
+        <div class="ob-section-label"><i class="ti ti-lock"></i> Recipe privacy default</div>
+        <div class="ob-section-desc">You can always change this per recipe. Public recipes appear in the community library.</div>
+        <div class="ob-chips" id="ob-privacy-chips">
+          <div class="ob-chip selected" data-val="private" onclick="obChip('defaultPrivacy',this)">🔒 Private by default</div>
+          <div class="ob-chip" data-val="public" onclick="obChip('defaultPrivacy',this)">🌍 Public by default</div>
+        </div>
+      </div>
+
+    </div>
+    <div class="ob-footer">
+      <button class="ob-skip-sm" onclick="obSkip()">Skip</button>
+      <button class="btn-primary" style="padding:11px 28px" onclick="obFinish()" id="ob-finish-btn">Save & get cooking 🍴</button>
     </div>
   </div>
 </div>
@@ -1532,8 +1558,12 @@ async function submitAuth(mode){
 }
 async function onAuthSuccess(user,isNew=false){
   currentUser=user;closeAuthModal();hideLanding();
-  try{const data=await dbGet('/api/auth/me');currentProfile=data.profile;updateUserUI();if(isNew||!currentProfile.onboarding_done){showOnboarding();}else{await loadApp();}}
-  catch(e){showOnboarding();}
+  try{
+    const data=await dbGet('/api/auth/me');
+    currentProfile=data.profile;updateUserUI();
+    if(isNew||!currentProfile.onboarding_done){showOnboarding();}
+    else{await loadApp();}
+  }catch(e){await loadApp();}
 }
 async function signOut(){
   try{await dbPost('/api/auth/signout',{});}catch(e){}
@@ -1562,26 +1592,53 @@ function toggleRecipePrivacy(){
 }
 
 // ── Onboarding ────────────────────────────────────────────────
-let obStep=0,obData={diet:'omnivore',household:'family',starterRecipes:'yes',defaultPrivate:true};
-function showOnboarding(){document.getElementById('onboard-screen').style.display='flex';document.getElementById('app').style.display='none';obStep=0;renderObStep();}
-function hideOnboarding(){document.getElementById('onboard-screen').style.display='none';document.getElementById('app').style.display='flex';}
-function renderObStep(){for(let i=0;i<4;i++){document.getElementById('ob-step-'+i).classList.toggle('active',i===obStep);const d=document.getElementById('ob-dot-'+i);d.classList.toggle('active',i===obStep);d.classList.toggle('done',i<obStep);}}
-function obNext(){obStep=Math.min(3,obStep+1);renderObStep();}
-function obSelect(field,el){el.closest('.onboard-grid').querySelectorAll('.onboard-opt').forEach(o=>o.classList.remove('selected'));el.classList.add('selected');obData[field]=el.dataset.val;}
-function obSelectStarter(val){obData.starterRecipes=val;document.getElementById('ob-starter-yes').classList.toggle('selected',val==='yes');document.getElementById('ob-starter-no').classList.toggle('selected',val==='no');}
+let obData={diet:'omnivore',household:'family',starterRecipes:'yes',defaultPrivacy:'private'};
+
+function showOnboarding(){
+  // Load the app in the background first, then show modal over it
+  document.getElementById('app').style.display='flex';
+  document.getElementById('onboard-screen').style.display='flex';
+  document.getElementById('landing').style.display='none';
+  loadRecipes(); // load (empty) library in background
+}
+function hideOnboarding(){document.getElementById('onboard-screen').style.display='none';}
+
+function obChip(field, el){
+  el.closest('.ob-chips').querySelectorAll('.ob-chip').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  obData[field]=el.dataset.val;
+}
+
+function obSkip(){
+  hideOnboarding();
+  // Mark onboarding done without saving prefs (use defaults)
+  dbPatch('/api/auth/profile',{onboarding_done:true}).catch(()=>{});
+}
+
 async function obFinish(){
-  const btn=document.getElementById('ob-finish-btn');btn.textContent='Setting up…';btn.disabled=true;
-  obData.defaultPrivate=document.getElementById('ob-priv-private').checked;
+  const btn=document.getElementById('ob-finish-btn');
+  btn.textContent='Saving…';btn.disabled=true;
   try{
-    await dbPatch('/api/auth/profile',{diet:obData.diet,household:obData.household,default_private:obData.defaultPrivate,onboarding_done:true});
+    await dbPatch('/api/auth/profile',{
+      diet:obData.diet,
+      household:obData.household,
+      default_private:obData.defaultPrivacy==='private',
+      onboarding_done:true
+    });
     currentProfile={...currentProfile,...obData,onboarding_done:true};
     if(obData.starterRecipes==='yes'){
       const starters=getStarterRecipes(obData.diet,obData.household);
-      const isPublic=!obData.defaultPrivate;
-      try{await dbPost('/api/recipes/bulk',{recipes:starters.map(r=>({...r,is_public:isPublic}))});}catch(e){console.warn('Starter save failed',e);}
+      const isPublic=obData.defaultPrivacy==='public';
+      try{
+        const saved=await dbPost('/api/recipes/bulk',{recipes:starters.map(r=>({...r,is_public:isPublic}))});
+        if(saved&&saved.length){recipes=[...saved.map(rowToRecipe),...recipes];filterRecipes();updateCounts();}
+      }catch(e){console.warn('Starter save failed',e);}
     }
-    hideOnboarding();await loadApp();
-  }catch(e){btn.textContent='Let\'s cook 🍴';btn.disabled=false;showToast('Setup failed — please try again');}
+    hideOnboarding();
+  }catch(e){
+    btn.textContent='Save & get cooking 🍴';btn.disabled=false;
+    showToast('Could not save preferences — try again');
+  }
 }
 
 function getStarterRecipes(diet,household){
