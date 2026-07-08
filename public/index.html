@@ -580,6 +580,13 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <div class="auth-err" id="signup-err"></div>
       <button class="btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="submitAuth('signup')">Create account</button>
     </div>
+    <div id="auth-confirm-email" style="display:none;text-align:center;padding:8px 0 4px">
+      <div style="font-size:36px;margin-bottom:14px">📬</div>
+      <div style="font-family:'Lora',serif;font-size:17px;font-weight:600;color:var(--ink);margin-bottom:8px">Check your email</div>
+      <div style="font-size:13px;color:var(--ink3);line-height:1.6;margin-bottom:18px">We've sent a confirmation link to <strong id="auth-confirm-email-addr"></strong>. Click it to activate your account, then come back and sign in.</div>
+      <div style="font-size:11px;color:var(--ink4);margin-bottom:16px">Didn't get it? Check your spam folder, or wait a minute and try again.</div>
+      <button class="btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="setAuthTab('signin',document.getElementById('auth-tab-signin'))">Go to sign in</button>
+    </div>
     <div class="auth-footer" id="auth-footer-msg"></div>
   </div>
 </div>
@@ -1525,6 +1532,13 @@ function openAuthModal(tab='signin'){
   document.getElementById('auth-footer-msg').textContent='';
   document.getElementById('signin-err').style.display='none';
   document.getElementById('signup-err').style.display='none';
+  // Reset confirmation screen
+  document.getElementById('auth-confirm-email').style.display='none';
+  document.getElementById('auth-form-signup').style.display= tab==='signup'?'block':'none';
+  document.getElementById('auth-tab-signin').style.pointerEvents='';
+  document.getElementById('auth-tab-signup').style.pointerEvents='';
+  const btn=document.querySelector('#auth-form-signup .btn-primary');
+  if(btn){btn.textContent='Create account';btn.disabled=false;}
   // Focus first input
   setTimeout(()=>{const inp=document.querySelector('#auth-modal input');if(inp)inp.focus();},50);
 }
@@ -1546,14 +1560,31 @@ async function submitAuth(mode){
   if(mode==='signin'){
     const email=document.getElementById('signin-email').value.trim(),password=document.getElementById('signin-password').value;
     if(!email||!password){err.textContent='Please fill in all fields.';err.style.display='block';return;}
-    try{const data=await fetch('/api/auth/signin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})}).then(r=>r.json());if(data.error){err.textContent=data.error;err.style.display='block';return;}authToken=data.session.access_token;localStorage.setItem('rish_token',authToken);await onAuthSuccess(data.user);}
-    catch(e){err.textContent='Sign in failed. Try again.';err.style.display='block';}
+    const btn=document.querySelector('#auth-form-signin .btn-primary');
+    btn.textContent='Signing in…';btn.disabled=true;
+    try{const data=await fetch('/api/auth/signin',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password})}).then(r=>r.json());if(data.error){err.textContent=data.error;err.style.display='block';btn.textContent='Sign in';btn.disabled=false;return;}authToken=data.session.access_token;localStorage.setItem('rish_token',authToken);await onAuthSuccess(data.user);}
+    catch(e){err.textContent='Sign in failed. Try again.';err.style.display='block';btn.textContent='Sign in';btn.disabled=false;}
   }else{
     const name=document.getElementById('signup-name').value.trim(),email=document.getElementById('signup-email').value.trim(),password=document.getElementById('signup-password').value;
     if(!name||!email||!password){err.textContent='Please fill in all fields.';err.style.display='block';return;}
     if(password.length<8){err.textContent='Password must be at least 8 characters.';err.style.display='block';return;}
-    try{const data=await fetch('/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,displayName:name})}).then(r=>r.json());if(data.error){err.textContent=data.error;err.style.display='block';return;}if(data.session){authToken=data.session.access_token;localStorage.setItem('rish_token',authToken);await onAuthSuccess(data.user,true);}else{document.getElementById('auth-footer-msg').textContent='Check your email to confirm, then sign in.';}}
-    catch(e){err.textContent='Sign up failed. Try again.';err.style.display='block';}
+    const btn=document.querySelector('#auth-form-signup .btn-primary');
+    btn.textContent='Creating account…';btn.disabled=true;
+    try{
+      const data=await fetch('/api/auth/signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password,displayName:name})}).then(r=>r.json());
+      if(data.error){err.textContent=data.error;err.style.display='block';btn.textContent='Create account';btn.disabled=false;return;}
+      if(data.session){
+        // Email confirmations off — signed in immediately
+        authToken=data.session.access_token;localStorage.setItem('rish_token',authToken);await onAuthSuccess(data.user,true);
+      } else {
+        // Email confirmation required — show check-your-email screen
+        document.getElementById('auth-form-signup').style.display='none';
+        document.getElementById('auth-confirm-email-addr').textContent=email;
+        document.getElementById('auth-confirm-email').style.display='block';
+        document.getElementById('auth-tab-signin').style.pointerEvents='none';
+        document.getElementById('auth-tab-signup').style.pointerEvents='none';
+      }
+    }catch(e){err.textContent='Sign up failed. Try again.';err.style.display='block';btn.textContent='Create account';btn.disabled=false;}
   }
 }
 async function onAuthSuccess(user,isNew=false){
