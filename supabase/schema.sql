@@ -1,14 +1,29 @@
 -- ============================================================
--- Mise — Supabase schema  (v2 — adds photo_url column)
+-- Rish — Supabase schema v3 (user auth + public recipes)
 -- Run this in: Supabase Dashboard → SQL Editor → New query
+-- NOTE: Supabase Auth must be enabled (it is by default)
 -- ============================================================
 
--- ── recipes ──────────────────────────────────────────────────
+-- ── user_profiles ─────────────────────────────────────────────
+-- One row per authenticated user, storing onboarding prefs
+create table if not exists user_profiles (
+  id              uuid        primary key references auth.users(id) on delete cascade,
+  display_name    text        not null default '',
+  diet            text        not null default 'omnivore'
+                              check (diet in ('vegan','vegetarian','pescatarian','omnivore','keto','paleo')),
+  household       text        not null default 'family'
+                              check (household in ('solo','couple','family','large')),
+  default_private boolean     not null default true,
+  onboarding_done boolean     not null default false,
+  created_at      timestamptz default now()
+);
+
+-- ── recipes ───────────────────────────────────────────────────
 create table if not exists recipes (
   id            uuid        primary key default gen_random_uuid(),
+  user_id       uuid        not null references auth.users(id) on delete cascade,
   name          text        not null,
-  cats          text[]      not null default '{dinner}'
-
+  cats          text[]      not null default '{dinner}',
   emoji         text        not null default '🍽️',
   src           text        not null default 'manual'
                             check (src in ('photo','screenshot','url','manual')),
@@ -18,104 +33,104 @@ create table if not exists recipes (
   rating        integer     default 0 check (rating between 0 and 5),
   notes         text        default '',
   tags          text[]      default '{}',
-  profiles      text[]      default '{}',
+  family_profiles text[]    default '{}',
   edits         jsonb       default '[]',
   ings          jsonb       default '[]',
   steps         jsonb       default '[]',
-  photo_url     text        default '',   -- real food photo URL
-  source_label  text        default '',   -- human-readable source credit
-  source_url    text        default '',   -- original URL if imported from web
-  macros        jsonb       default null, -- {kcal,protein_g,carbs_g,fat_g,note}
+  photo_url     text        default '',
+  source_label  text        default '',
+  source_url    text        default '',
+  macros        jsonb       default null,
+  is_public     boolean     not null default false,
+  public_likes  integer     not null default 0,
   created_at    timestamptz default now(),
   updated_at    timestamptz default now()
 );
 
-create index if not exists recipes_name_fts
-  on recipes using gin (to_tsvector('english', name));
+create index if not exists recipes_user_idx on recipes (user_id);
+create index if not exists recipes_public_idx on recipes (is_public) where is_public = true;
+create index if not exists recipes_name_fts on recipes using gin (to_tsvector('english', name));
+create index if not exists recipes_tags_idx on recipes using gin (tags);
 
-create index if not exists recipes_tags_idx
-  on recipes using gin (tags);
-
--- ── profiles ─────────────────────────────────────────────────
-create table if not exists profiles (
-  id          uuid primary key default gen_random_uuid(),
-  name        text   not null,
-  emoji       text   not null default '👤',
-  preferences jsonb  default '{}',
-  created_at  timestamptz default now()
+-- ── public_recipe_likes ───────────────────────────────────────
+-- Tracks which users liked a public recipe (prevents double-liking)
+create table if not exists public_recipe_likes (
+  user_id   uuid not null references auth.users(id) on delete cascade,
+  recipe_id uuid not null references recipes(id) on delete cascade,
+  created_at timestamptz default now(),
+  primary key (user_id, recipe_id)
 );
 
 -- ── grocery_items ─────────────────────────────────────────────
 create table if not exists grocery_items (
   id          uuid    primary key default gen_random_uuid(),
-  name        text    not null unique,
+  user_id     uuid    not null references auth.users(id) on delete cascade,
+  name        text    not null,
   amt         text    default '',
   cat         text    default 'other',
   checked     boolean default false,
-  created_at  timestamptz default now()
+  created_at  timestamptz default now(),
+  unique (user_id, name)
 );
 
 -- ── planner_slots ─────────────────────────────────────────────
 create table if not exists planner_slots (
   id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
   week       text not null,
   day        text not null,
   meal       text not null check (meal in ('Breakfast','Lunch','Dinner')),
   recipe_id  uuid references recipes(id) on delete set null,
-  unique (week, day, meal)
+  unique (user_id, week, day, meal)
 );
 
 -- ── updated_at trigger ────────────────────────────────────────
 create or replace function set_updated_at()
 returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
-$$;
+begin new.updated_at = now(); return new; end; $$;
 
 drop trigger if exists recipes_updated_at on recipes;
 create trigger recipes_updated_at
   before update on recipes
   for each row execute procedure set_updated_at();
 
--- ── Row Level Security (open for beta — tighten before public launch) ──
-alter table recipes       enable row level security;
-alter table profiles      enable row level security;
-alter table grocery_items enable row level security;
-alter table planner_slots enable row level security;
+-- ── Row Level Security ────────────────────────────────────────
+alter table user_profiles     enable row level security;
+alter table recipes           enable row level security;
+alter table public_recipe_likes enable row level security;
+alter table grocery_items     enable row level security;
+alter table planner_slots     enable row level security;
 
-create policy "public read/write recipes"
-  on recipes for all using (true) with check (true);
-create policy "public read/write profiles"
-  on profiles for all using (true) with check (true);
-create policy "public read/write grocery"
-  on grocery_items for all using (true) with check (true);
-create policy "public read/write planner"
-  on planner_slots for all using (true) with check (true);
+-- user_profiles: own row only
+create policy "users manage own profile"
+  on user_profiles for all
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
 
--- ── Seed data ─────────────────────────────────────────────────
-insert into recipes (name, cats, emoji, src, time, base_servings, time_made, rating, tags, profiles, photo_url, ings, steps)
-values
-  (
-    'Avocado toast with poached egg', 'breakfast', '🥑', 'manual', '15 min', 2, 8, 5,
-    array['quick','weeknight'], array['maya','luca'],
-    'https://images.unsplash.com/photo-1541519227354-08fa5d50c820?w=400&q=80',
-    '[{"amt":"2 slices","unit":null,"qty":2,"name":"sourdough"},{"amt":"1","unit":null,"qty":1,"name":"avocado"},{"amt":"2","unit":null,"qty":2,"name":"eggs"},{"amt":"1 tsp","unit":"tsp","qty":1,"name":"lemon juice"},{"amt":"to taste","unit":null,"qty":null,"name":"chili flakes"}]',
-    '["Toast sourdough until golden and crisp.","Mash avocado with lemon juice, salt, and chili flakes.","Poach eggs in gently simmering water for 3 minutes.","Spread avocado on toast, top with egg."]'
-  ),
-  (
-    'Salmon teriyaki', 'dinner', '🐟', 'manual', '25 min', 2, 7, 5,
-    array['asian','quick'], array['dad','maya'],
-    'https://images.unsplash.com/photo-1467003909585-2f8a72700288?w=400&q=80',
-    '[{"amt":"2 fillets","unit":null,"qty":2,"name":"salmon"},{"amt":"3 tbsp","unit":"tbsp","qty":3,"name":"soy sauce"},{"amt":"2 tbsp","unit":"tbsp","qty":2,"name":"mirin"},{"amt":"1 tbsp","unit":"tbsp","qty":1,"name":"honey"},{"amt":"1 tsp","unit":"tsp","qty":1,"name":"sesame oil"}]',
-    '["Mix soy, mirin, honey, sesame oil into a glaze.","Marinate salmon 15 min.","Sear skin-side down 4 min, flip and glaze.","Serve over steamed rice."]'
-  ),
-  (
-    'Chocolate lava cake', 'dessert', '🍫', 'manual', '20 min', 4, 6, 5,
-    array['family-favourite'], array['dad','maya','luca'],
-    'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&q=80',
-    '[{"amt":"100g","unit":"g","qty":100,"name":"dark chocolate"},{"amt":"100g","unit":"g","qty":100,"name":"butter"},{"amt":"4","unit":null,"qty":4,"name":"eggs"},{"amt":"100g","unit":"g","qty":100,"name":"powdered sugar"},{"amt":"2 tbsp","unit":"tbsp","qty":2,"name":"flour"}]',
-    '["Melt chocolate and butter together.","Whisk in eggs, yolks, and sugar.","Fold in flour gently.","Bake at 200°C for exactly 12 min."]'
-  )
-on conflict do nothing;
+-- recipes: own recipes always; public recipes readable by all
+create policy "users manage own recipes"
+  on recipes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "public recipes readable by all"
+  on recipes for select
+  using (is_public = true);
+
+-- likes: own rows only
+create policy "users manage own likes"
+  on public_recipe_likes for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- grocery: own items only
+create policy "users manage own grocery"
+  on grocery_items for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- planner: own slots only
+create policy "users manage own planner"
+  on planner_slots for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
