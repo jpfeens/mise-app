@@ -471,12 +471,38 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <div style="border-top:1px solid var(--rule);padding-top:10px"><div class="section-lbl">Taste preferences</div><div style="display:flex;flex-wrap:wrap;gap:4px"><span class="ppill">Asian</span><span class="ppill">Mediterranean</span><span class="ppill">Spicy</span><span class="ppill">Citrusy</span></div></div>
     </div>
   </div>
-/* ── Auth & Onboarding overlay ── */
-.auth-screen{position:fixed;inset:0;background:var(--paper2);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
-.auth-card{background:var(--paper);border:1px solid var(--paper4);border-radius:var(--r3);padding:36px 32px;max-width:400px;width:100%;box-shadow:var(--shadow2)}
-.auth-logo{font-family:'Lora',serif;font-size:28px;font-weight:600;color:var(--ink);margin-bottom:4px}
-.auth-tagline{font-size:12px;color:var(--ink4);margin-bottom:28px}
-.auth-tab-row{display:flex;gap:0;margin-bottom:24px;border:1px solid var(--paper3);border-radius:var(--r);overflow:hidden}
+/* ── Landing page ── */
+.landing{position:fixed;inset:0;background:var(--paper);z-index:90;display:flex;flex-direction:column;overflow-y:auto}
+.landing-nav{display:flex;align-items:center;padding:18px 40px;border-bottom:1px solid var(--rule);gap:16px;flex-shrink:0}
+.landing-logo{font-family:'Lora',serif;font-size:22px;font-weight:600;color:var(--ink);letter-spacing:-.02em;flex:1}
+.landing-nav-btns{display:flex;gap:10px;align-items:center}
+.btn-ghost-sm{padding:7px 16px;border:1px solid var(--paper4);border-radius:var(--r);font-size:13px;cursor:pointer;background:transparent;color:var(--ink3);font-weight:500}
+.btn-ghost-sm:hover{border-color:var(--ink4);color:var(--ink)}
+.btn-accent-sm{padding:7px 18px;border:none;border-radius:var(--r);font-size:13px;cursor:pointer;background:var(--accent);color:#fff;font-weight:500}
+.btn-accent-sm:hover{background:var(--accent2)}
+.landing-hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:60px 24px 40px;max-width:680px;margin:0 auto}
+.landing-title{font-family:'Lora',serif;font-size:clamp(36px,6vw,56px);font-weight:600;line-height:1.15;color:var(--ink);margin-bottom:18px}
+.landing-title em{font-style:italic;color:var(--accent)}
+.landing-desc{font-size:16px;color:var(--ink3);line-height:1.65;max-width:520px;margin:0 auto 36px}
+.landing-cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:48px}
+.btn-landing-primary{padding:13px 30px;border:none;border-radius:var(--r2);font-size:15px;cursor:pointer;background:var(--accent);color:#fff;font-weight:500;font-family:'Inter',sans-serif}
+.btn-landing-primary:hover{background:var(--accent2)}
+.btn-landing-ghost{padding:13px 30px;border:1.5px solid var(--paper4);border-radius:var(--r2);font-size:15px;cursor:pointer;background:transparent;color:var(--ink2);font-weight:500;font-family:'Inter',sans-serif}
+.btn-landing-ghost:hover{border-color:var(--ink4)}
+.landing-features{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:18px;width:100%;max-width:640px}
+.landing-feat{background:var(--paper2);border:1px solid var(--paper3);border-radius:var(--r2);padding:18px 16px;text-align:left}
+.landing-feat-icon{font-size:22px;margin-bottom:8px}
+.landing-feat-title{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.landing-feat-desc{font-size:11px;color:var(--ink4);line-height:1.5}
+
+/* ── Auth modal ── */
+.auth-modal-backdrop{position:fixed;inset:0;background:rgba(26,24,20,.45);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)}
+.auth-card{background:var(--paper);border:1px solid var(--paper4);border-radius:var(--r3);padding:36px 32px;max-width:400px;width:100%;box-shadow:var(--shadow2);position:relative}
+.auth-close{position:absolute;top:14px;right:14px;width:28px;height:28px;border:none;background:none;cursor:pointer;color:var(--ink4);font-size:18px;display:flex;align-items:center;justify-content:center;border-radius:var(--r)}
+.auth-close:hover{background:var(--paper3);color:var(--ink)}
+.auth-logo{font-family:'Lora',serif;font-size:24px;font-weight:600;color:var(--ink);margin-bottom:3px}
+.auth-tagline{font-size:12px;color:var(--ink4);margin-bottom:24px}
+.auth-tab-row{display:flex;gap:0;margin-bottom:22px;border:1px solid var(--paper3);border-radius:var(--r);overflow:hidden}
 .auth-tab{flex:1;padding:8px;text-align:center;font-size:12px;font-weight:500;cursor:pointer;color:var(--ink4);background:var(--paper)}
 .auth-tab.active{background:var(--ink);color:#fff}
 .auth-field{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
@@ -535,13 +561,42 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
 </style>
 
 <!-- Auth screen -->
-<div class="auth-screen" id="auth-screen" style="display:none">
+<!-- ═══════ LANDING PAGE ═══════ -->
+<div id="landing" style="display:none">
+  <div class="landing">
+    <nav class="landing-nav">
+      <div class="landing-logo">rish.</div>
+      <div class="landing-nav-btns">
+        <button class="btn-ghost-sm" onclick="openAuthModal('signin')">Sign in</button>
+        <button class="btn-accent-sm" onclick="openAuthModal('signup')">Get started</button>
+      </div>
+    </nav>
+    <div class="landing-hero">
+      <h1 class="landing-title">Your recipes,<br><em>beautifully organised</em></h1>
+      <p class="landing-desc">Import recipes from screenshots, URLs, photos or PDFs. Build a personal library that syncs across all your devices. Discover new ideas, plan your week, and share with the community.</p>
+      <div class="landing-cta-row">
+        <button class="btn-landing-primary" onclick="openAuthModal('signup')">Create free account</button>
+        <button class="btn-landing-ghost" onclick="openAuthModal('signin')">Sign in</button>
+      </div>
+      <div class="landing-features">
+        <div class="landing-feat"><div class="landing-feat-icon">📸</div><div class="landing-feat-title">Import anything</div><div class="landing-feat-desc">Screenshot, URL, PDF or photo — Claude extracts the recipe instantly</div></div>
+        <div class="landing-feat"><div class="landing-feat-icon">📱</div><div class="landing-feat-title">Syncs everywhere</div><div class="landing-feat-desc">Your library follows you across phone, tablet and desktop</div></div>
+        <div class="landing-feat"><div class="landing-feat-icon">✨</div><div class="landing-feat-title">AI-powered discover</div><div class="landing-feat-desc">Tell Claude what you're craving and get a perfect recipe suggestion</div></div>
+        <div class="landing-feat"><div class="landing-feat-icon">🌍</div><div class="landing-feat-title">Community library</div><div class="landing-feat-desc">Browse, like and save public recipes from other Rish users</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ AUTH MODAL ═══════ -->
+<div class="auth-modal-backdrop" id="auth-modal" style="display:none" onclick="closeAuthModalOnBackdrop(event)">
   <div class="auth-card">
+    <button class="auth-close" onclick="closeAuthModal()"><i class="ti ti-x"></i></button>
     <div class="auth-logo">rish.</div>
     <div class="auth-tagline">Your personal recipe library</div>
     <div class="auth-tab-row">
-      <div class="auth-tab active" onclick="setAuthTab('signin',this)">Sign in</div>
-      <div class="auth-tab" onclick="setAuthTab('signup',this)">Create account</div>
+      <div class="auth-tab active" id="auth-tab-signin" onclick="setAuthTab('signin',this)">Sign in</div>
+      <div class="auth-tab" id="auth-tab-signup" onclick="setAuthTab('signup',this)">Create account</div>
     </div>
     <div id="auth-form-signin">
       <div class="auth-field"><label>Email</label><input type="email" id="signin-email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')submitAuth('signin')"></div>
@@ -1470,9 +1525,46 @@ function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').rep
 function escAttr(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,2400);}
 // ── Auth screens ──────────────────────────────────────────────
-function showAuthScreen(){document.getElementById('auth-screen').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('onboard-screen').style.display='none';}
-function hideAuthScreen(){document.getElementById('auth-screen').style.display='none';}
-function setAuthTab(tab,el){document.querySelectorAll('.auth-tab').forEach(t=>t.classList.toggle('active',t===el));document.getElementById('auth-form-signin').style.display=tab==='signin'?'block':'none';document.getElementById('auth-form-signup').style.display=tab==='signup'?'block':'none';document.getElementById('auth-footer-msg').textContent='';}
+function showLanding(){
+  document.getElementById('landing').style.display='block';
+  document.getElementById('app').style.display='none';
+  document.getElementById('onboard-screen').style.display='none';
+}
+function hideLanding(){document.getElementById('landing').style.display='none';}
+
+function openAuthModal(tab='signin'){
+  document.getElementById('auth-modal').style.display='flex';
+  // Switch to the right tab
+  const signinTab=document.getElementById('auth-tab-signin');
+  const signupTab=document.getElementById('auth-tab-signup');
+  if(tab==='signup'){
+    signinTab.classList.remove('active');signupTab.classList.add('active');
+    document.getElementById('auth-form-signin').style.display='none';
+    document.getElementById('auth-form-signup').style.display='block';
+  } else {
+    signupTab.classList.remove('active');signinTab.classList.add('active');
+    document.getElementById('auth-form-signin').style.display='block';
+    document.getElementById('auth-form-signup').style.display='none';
+  }
+  document.getElementById('auth-footer-msg').textContent='';
+  document.getElementById('signin-err').style.display='none';
+  document.getElementById('signup-err').style.display='none';
+  // Focus first input
+  setTimeout(()=>{const inp=document.querySelector('#auth-modal input');if(inp)inp.focus();},50);
+}
+function closeAuthModal(){document.getElementById('auth-modal').style.display='none';}
+function closeAuthModalOnBackdrop(e){if(e.target===document.getElementById('auth-modal'))closeAuthModal();}
+
+// Keep these aliases so existing code still works
+function showAuthScreen(){showLanding();}
+function hideAuthScreen(){closeAuthModal();}
+
+function setAuthTab(tab,el){
+  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.toggle('active',t===el));
+  document.getElementById('auth-form-signin').style.display=tab==='signin'?'block':'none';
+  document.getElementById('auth-form-signup').style.display=tab==='signup'?'block':'none';
+  document.getElementById('auth-footer-msg').textContent='';
+}
 async function submitAuth(mode){
   const err=document.getElementById(mode+'-err');err.style.display='none';
   if(mode==='signin'){
@@ -1489,14 +1581,16 @@ async function submitAuth(mode){
   }
 }
 async function onAuthSuccess(user,isNew=false){
-  currentUser=user;hideAuthScreen();
+  currentUser=user;closeAuthModal();hideLanding();
   try{const data=await dbGet('/api/auth/me');currentProfile=data.profile;updateUserUI();if(isNew||!currentProfile.onboarding_done){showOnboarding();}else{await loadApp();}}
   catch(e){showOnboarding();}
 }
 async function signOut(){
   try{await dbPost('/api/auth/signout',{});}catch(e){}
   authToken=null;currentUser=null;currentProfile=null;localStorage.removeItem('rish_token');
-  recipes=[];filterRecipes();toggleUserMenu(true);showAuthScreen();
+  recipes=[];filterRecipes();toggleUserMenu(true);
+  document.getElementById('app').style.display='none';
+  showLanding();
 }
 function updateUserUI(){
   if(!currentUser)return;
@@ -1591,7 +1685,7 @@ async function boot(){
       return;
     }catch(e){authToken=null;localStorage.removeItem('rish_token');}
   }
-  showAuthScreen();
+  showLanding();
 }
 
 boot();
