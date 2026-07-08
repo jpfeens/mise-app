@@ -151,8 +151,11 @@ app.get('/api/auth/me', requireAuth(async (req, res) => {
 app.patch('/api/auth/profile', requireAuth(async (req, res) => {
   const allowed = ['display_name','diet','household','default_private','onboarding_done'];
   const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
+  // Use upsert so it works even if the profile row wasn't created on signup
   const { data, error } = await userClient(req)
-    .from('user_profiles').update(updates).eq('id', req.user.id).select().single();
+    .from('user_profiles')
+    .upsert({ id: req.user.id, ...updates }, { onConflict: 'id' })
+    .select().single();
   if (error) return res.status(500).json({ error: 'Could not update profile.' });
   res.json(data);
 }));

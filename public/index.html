@@ -1726,6 +1726,8 @@ function obSkip(){
 async function obFinish(){
   const btn=document.getElementById('ob-finish-btn');
   btn.textContent='Saving…';btn.disabled=true;
+
+  // Save profile prefs — use try/catch so a DB hiccup doesn't block the user
   try{
     await dbPatch('/api/auth/profile',{
       diet:obData.diet,
@@ -1733,20 +1735,36 @@ async function obFinish(){
       default_private:obData.defaultPrivacy==='private',
       onboarding_done:true
     });
-    currentProfile={...currentProfile,...obData,onboarding_done:true};
-    if(obData.starterRecipes==='yes'){
+    currentProfile={...currentProfile,diet:obData.diet,household:obData.household,
+      default_private:obData.defaultPrivacy==='private',onboarding_done:true};
+  }catch(e){
+    console.warn('Profile save failed — continuing anyway',e);
+    // Mark done locally so we don't loop back to onboarding
+    if(!currentProfile)currentProfile={};
+    currentProfile.onboarding_done=true;
+  }
+
+  // Seed starter recipes
+  if(obData.starterRecipes==='yes'){
+    try{
       const starters=getStarterRecipes(obData.diet,obData.household);
       const isPublic=obData.defaultPrivacy==='public';
-      try{
-        const saved=await dbPost('/api/recipes/bulk',{recipes:starters.map(r=>({...r,is_public:isPublic}))});
-        if(saved&&saved.length){recipes=[...saved.map(rowToRecipe),...recipes];filterRecipes();updateCounts();}
-      }catch(e){console.warn('Starter save failed',e);}
+      const rows=starters.map(r=>({...r,is_public:isPublic}));
+      const saved=await dbPost('/api/recipes/bulk',{recipes:rows});
+      if(saved&&saved.length){
+        recipes=[...saved.map(rowToRecipe),...recipes];
+      }
+    }catch(e){
+      console.warn('Starter recipes failed — will try loading from DB',e);
     }
-    hideOnboarding();
-  }catch(e){
-    btn.textContent='Save & get cooking 🍴';btn.disabled=false;
-    showToast('Could not save preferences — try again');
   }
+
+  // Always dismiss onboarding and show the library
+  hideOnboarding();
+  filterRecipes();
+  updateCounts();
+  btn.textContent='Save & get cooking 🍴';
+  btn.disabled=false;
 }
 
 function getStarterRecipes(diet,household){
