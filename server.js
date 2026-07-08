@@ -151,12 +151,14 @@ app.get('/api/auth/me', requireAuth(async (req, res) => {
 app.patch('/api/auth/profile', requireAuth(async (req, res) => {
   const allowed = ['display_name','diet','household','default_private','onboarding_done'];
   const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
-  // Use upsert so it works even if the profile row wasn't created on signup
-  const { data, error } = await userClient(req)
+  console.log('PATCH /api/auth/profile user:', req.user.id, 'updates:', updates);
+  // Use admin client for upsert to bypass RLS insert restriction on new rows
+  const { data, error } = await supabaseAdmin
     .from('user_profiles')
     .upsert({ id: req.user.id, ...updates }, { onConflict: 'id' })
     .select().single();
-  if (error) return res.status(500).json({ error: 'Could not update profile.' });
+  console.log('profile upsert result:', { data, error });
+  if (error) return res.status(500).json({ error: 'Could not update profile.', detail: error.message });
   res.json(data);
 }));
 
@@ -183,8 +185,10 @@ app.post('/api/recipes/bulk', requireAuth(async (req, res) => {
   const { recipes } = req.body;
   if (!Array.isArray(recipes) || !recipes.length) return res.status(400).json({ error: 'recipes array required' });
   const rows = recipes.map(r => ({ ...sanitiseRecipe(r), user_id: req.user.id }));
+  console.log('POST /api/recipes/bulk user:', req.user.id, 'count:', rows.length, 'first recipe:', rows[0]?.name);
   const { data, error } = await userClient(req).from('recipes').insert(rows).select();
-  if (error) return res.status(500).json({ error: 'Could not save recipes.' });
+  console.log('bulk insert result:', { count: data?.length, error: error?.message });
+  if (error) return res.status(500).json({ error: 'Could not save recipes.', detail: error.message });
   res.status(201).json(data);
 }));
 

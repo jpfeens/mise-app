@@ -1729,17 +1729,18 @@ async function obFinish(){
 
   // Save profile prefs — use try/catch so a DB hiccup doesn't block the user
   try{
-    await dbPatch('/api/auth/profile',{
+    console.log('obFinish: saving profile', {diet:obData.diet,household:obData.household,defaultPrivacy:obData.defaultPrivacy});
+    const profileResult=await dbPatch('/api/auth/profile',{
       diet:obData.diet,
       household:obData.household,
       default_private:obData.defaultPrivacy==='private',
       onboarding_done:true
     });
+    console.log('obFinish: profile saved', profileResult);
     currentProfile={...currentProfile,diet:obData.diet,household:obData.household,
       default_private:obData.defaultPrivacy==='private',onboarding_done:true};
   }catch(e){
-    console.warn('Profile save failed — continuing anyway',e);
-    // Mark done locally so we don't loop back to onboarding
+    console.warn('obFinish: profile save failed', e);
     if(!currentProfile)currentProfile={};
     currentProfile.onboarding_done=true;
   }
@@ -1748,14 +1749,16 @@ async function obFinish(){
   if(obData.starterRecipes==='yes'){
     try{
       const starters=getStarterRecipes(obData.diet,obData.household);
+      console.log('obFinish: seeding', starters.length, 'starter recipes for diet:', obData.diet);
       const isPublic=obData.defaultPrivacy==='public';
       const rows=starters.map(r=>({...r,is_public:isPublic}));
       const saved=await dbPost('/api/recipes/bulk',{recipes:rows});
+      console.log('obFinish: bulk save result', saved?.length, 'recipes');
       if(saved&&saved.length){
         recipes=[...saved.map(rowToRecipe),...recipes];
       }
     }catch(e){
-      console.warn('Starter recipes failed — will try loading from DB',e);
+      console.warn('obFinish: starter recipes failed', e);
     }
   }
 
