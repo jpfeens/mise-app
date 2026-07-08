@@ -656,7 +656,13 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
 </div>
 
 <script>
-const PROFILES=[{id:'maya',emoji:'\u{1F469}',name:'Maya',bg:'#fde8c8'},{id:'dad',emoji:'\u{1F468}',name:'Dad',bg:'#d4edbe'},{id:'luca',emoji:'\u{1F9D2}',name:'Luca',bg:'#c8deff'}];
+// Profiles — just the signed-in user (no hardcoded family profiles)
+function getProfiles(){
+  if(!currentUser)return[];
+  const name=currentProfile?.display_name||currentUser.email?.split('@')[0]||'Me';
+  return [{id:'me',emoji:'🧑',name,bg:'#e8edf5'}];
+}
+const profileMap={}; // populated dynamically
 const DAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],MEALS=['Breakfast','Lunch','Dinner'];
 const EMOJI_OPTIONS=['\u{1F951}','\u{1F373}','\u{1F95E}','\u{1FAD0}','\u{1F957}','\u{1F956}','\u{1F345}','\u{1F41F}','\u{1F344}','\u{1F32E}','\u{1FAD8}','\u{1F36B}','\u{1F34B}','\u{1F355}','\u{1F35C}','\u{1F372}','\u{1F958}','\u{1F35B}','\u{1F35D}','\u{1F969}','\u{1F357}','\u{1F990}','\u{1F32F}','\u{1F959}','\u{1F9C1}','\u{1F370}','\u{1F36A}','\u{1F967}','\u{1F369}','\u{1F955}','\u{1F346}','\u{1F966}','\u{1FAD2}','\u{1F347}','\u{1F952}','\u{1F336}','\u{1F9C4}','\u{1F9C5}','\u{1F954}','\u{1F35E}','\u{1F950}'];
 const BASE=[
@@ -826,7 +832,7 @@ const catPlateColors={breakfast:"#fde8c8",lunch:"#d4edbe",dinner:"#c8deff",snack
 const catPills={breakfast:"cpb",lunch:"cpl",dinner:"cpd",snack:"cps",dessert:"cpe"};
 const srcDot={photo:"dot-ph",screenshot:"dot-sc",url:"dot-ur",manual:"dot-mn"};
 const catNames={all:"All recipes",breakfast:"Breakfast",lunch:"Lunch",dinner:"Dinner",snack:"Snacks",dessert:"Desserts"};
-const profileMap=Object.fromEntries(PROFILES.map(p=>[p.id,p]));
+function getProfileMap(){const m={};getProfiles().forEach(p=>m[p.id]=p);return m;}
 function getWearSVG(n){if(n<4)return'';const l=n>=10?3:n>=6?2:1;let s='';if(l>=1)s+=`<circle cx="148" cy="58" r="18" fill="none" stroke="rgba(139,94,60,0.14)" stroke-width="3"/><circle cx="148" cy="58" r="20" fill="none" stroke="rgba(139,94,60,0.06)" stroke-width="1"/>`;if(l>=2)s+=`<ellipse cx="22" cy="112" rx="13" ry="8" fill="rgba(180,140,90,0.1)" transform="rotate(-15 22 112)"/><circle cx="32" cy="85" r="3" fill="rgba(180,130,80,0.1)"/>`;if(l>=3)s+=`<circle cx="55" cy="130" r="16" fill="none" stroke="rgba(100,80,50,0.1)" stroke-width="2.5"/><ellipse cx="120" cy="155" rx="22" ry="14" fill="rgba(160,120,70,0.08)" transform="rotate(10 120 155)"/>`;return`<svg style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;border-radius:inherit" viewBox="0 0 170 180" preserveAspectRatio="none">${s}</svg>`;}
 function starHTML(r){return[1,2,3,4,5].map(i=>`<span class="star ${i<=r?'filled':''}">&#9733;</span>`).join('');}
 function renderGrid(list){
@@ -834,7 +840,7 @@ function renderGrid(list){
   if(!list.length){g.innerHTML='<div style="grid-column:1/-1;padding:40px;text-align:center;color:var(--ink4);font-size:13px;font-family:Lora,serif;font-style:italic">No recipes match.</div>';return;}
   g.innerHTML=list.map(r=>{
     const tags=r.tags.slice(0,2).map(t=>`<span class="tag">#${t}</span>`).join('');
-    const avatars=r.profiles.map(p=>{const pr=profileMap[p];return pr?`<div class="pavatar" style="background:${pr.bg}">${pr.emoji}</div>`:''}).join('');
+    const pm=getProfileMap();const avatars=r.profiles.map(p=>{const pr=pm[p];return pr?`<div class="pavatar" style="background:${pr.bg}">${pr.emoji}</div>`:''}).join('');
     const wear=getWearSVG(r.timeMade);
     const flag=r.timeMade>=8?'<div class="flag-corner"></div>':'';
     const primaryCat=r.cats[0]||'dinner';
@@ -1130,7 +1136,7 @@ function renderCbNotesTab(){const r=cbRecipe;return`<div style="max-width:560px"
 function setCbRating(n){cbRecipe.rating=n;const r=recipes.find(x=>x.id===cbRecipe.id);if(r)r.rating=n;persistRecipe(cbRecipe.id,{rating:n});renderCbTabBody();renderCookbook();}
 function saveCbNotes(){const ta=document.getElementById('cb-notes-ta');if(!ta)return;cbRecipe.notes=ta.value;const r=recipes.find(x=>x.id===cbRecipe.id);if(r)r.notes=ta.value;persistRecipe(cbRecipe.id,{notes:ta.value});showToast('Notes saved');}
 function addCbHandwritingEdit(){const orig=document.getElementById('cb-edit-orig'),nw=document.getElementById('cb-edit-new');if(!orig.value.trim()||!nw.value.trim())return;cbRecipe.edits.push({step:0,original:orig.value.trim(),edit:nw.value.trim()});const r=recipes.find(x=>x.id===cbRecipe.id);if(r)r.edits=[...cbRecipe.edits];persistRecipe(cbRecipe.id,{edits:cbRecipe.edits});orig.value='';nw.value='';renderCbRecipeBody();showToast('Edit added!');}
-function renderCbDetailsTab(){const r=cbRecipe;return`<div style="max-width:560px"><div class="section-lbl">Tags</div><div class="tags-row" style="margin-bottom:12px">${r.tags.map(t=>`<span class="detail-tag">#${t} <span class="tag-del" onclick="removeCbTag('${t}')">&times;</span></span>`).join('')}</div><div class="tag-input-row" style="max-width:300px;margin-bottom:20px"><input class="tag-input" id="cb-tag-inp" placeholder="#add a tag" onkeydown="if(event.key==='Enter')addCbTag()"><button class="btn-primary" style="padding:5px 9px;font-size:11px" onclick="addCbTag()">Add</button></div><div class="section-lbl">Assign to profiles</div><div class="profile-assign-row">${PROFILES.map(p=>`<div class="pa-pill ${r.profiles.includes(p.id)?'active':''}" onclick="toggleCbProfile('${p.id}')"><span>${p.emoji}</span> ${p.name}</div>`).join('')}</div></div>`;}
+function renderCbDetailsTab(){const r=cbRecipe;return`<div style="max-width:560px"><div class="section-lbl">Tags</div><div class="tags-row" style="margin-bottom:12px">${r.tags.map(t=>`<span class="detail-tag">#${t} <span class="tag-del" onclick="removeCbTag('${t}')">&times;</span></span>`).join('')}</div><div class="tag-input-row" style="max-width:300px;margin-bottom:20px"><input class="tag-input" id="cb-tag-inp" placeholder="#add a tag" onkeydown="if(event.key==='Enter')addCbTag()"><button class="btn-primary" style="padding:5px 9px;font-size:11px" onclick="addCbTag()">Add</button></div></div>`;}
 function addCbTag(){const inp=document.getElementById('cb-tag-inp');let tag=inp.value.trim().replace(/^#/,'').toLowerCase().replace(/\s+/g,'-');if(!tag||cbRecipe.tags.includes(tag))return;cbRecipe.tags.push(tag);const r=recipes.find(x=>x.id===cbRecipe.id);if(r)r.tags=[...cbRecipe.tags];persistRecipe(cbRecipe.id,{tags:cbRecipe.tags});inp.value='';renderCookbook();filterRecipes(document.getElementById('search-inp').value);}
 function removeCbTag(tag){cbRecipe.tags=cbRecipe.tags.filter(t=>t!==tag);const r=recipes.find(x=>x.id===cbRecipe.id);if(r)r.tags=[...cbRecipe.tags];persistRecipe(cbRecipe.id,{tags:cbRecipe.tags});renderCookbook();}
 function toggleCbProfile(pid){const idx=cbRecipe.profiles.indexOf(pid);if(idx>=0)cbRecipe.profiles.splice(idx,1);else cbRecipe.profiles.push(pid);const r=recipes.find(x=>x.id===cbRecipe.id);if(r)r.profiles=[...cbRecipe.profiles];persistRecipe(cbRecipe.id,{profiles:cbRecipe.profiles});renderCbTabBody();filterRecipes(document.getElementById('search-inp').value);}
@@ -1591,10 +1597,17 @@ async function onAuthSuccess(user,isNew=false){
   currentUser=user;closeAuthModal();hideLanding();
   try{
     const data=await dbGet('/api/auth/me');
-    currentProfile=data.profile;updateUserUI();
-    if(isNew||!currentProfile.onboarding_done){showOnboarding();}
-    else{await loadApp();}
-  }catch(e){await loadApp();}
+    currentProfile=data.profile;
+  }catch(e){
+    // Profile might not exist yet for brand new user — that's fine
+    currentProfile={onboarding_done:false};
+  }
+  updateUserUI();
+  if(isNew||!currentProfile.onboarding_done){
+    showOnboarding();
+  } else {
+    await loadApp();
+  }
 }
 async function signOut(){
   try{await dbPost('/api/auth/signout',{});}catch(e){}
@@ -1625,7 +1638,59 @@ document.addEventListener('click',e=>{
     if(dd)dd.style.display='none';
   }
 });
-function openAccountSettings(){toggleUserMenu(true);showToast('Account settings — coming soon');}
+function openAccountSettings(){
+  toggleUserMenu(true);
+  const name=currentProfile?.display_name||currentUser?.email?.split('@')[0]||'';
+  const diet=currentProfile?.diet||'omnivore';
+  const household=currentProfile?.household||'family';
+  const defaultPrivate=currentProfile?.default_private!==false;
+  // Build and show modal
+  const existing=document.getElementById('settings-modal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='settings-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(26,24,20,.5);z-index:300;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(3px)';
+  modal.innerHTML=`<div style="background:var(--paper);border-radius:var(--r3);padding:28px;max-width:400px;width:100%;box-shadow:var(--shadow2);position:relative">
+    <button onclick="document.getElementById('settings-modal').remove()" style="position:absolute;top:12px;right:12px;border:none;background:none;cursor:pointer;font-size:18px;color:var(--ink4);padding:4px 7px;border-radius:var(--r)"><i class="ti ti-x"></i></button>
+    <div style="font-family:'Lora',serif;font-size:18px;font-weight:600;margin-bottom:18px">Account settings</div>
+    <div class="auth-field"><label>Display name</label><input type="text" id="settings-name" value="${name}" style="padding:9px 11px;border:1px solid var(--paper3);border-radius:var(--r);font-size:13px;background:var(--paper);color:var(--ink);width:100%;box-sizing:border-box"></div>
+    <div style="font-size:11px;font-weight:500;color:var(--ink3);margin-bottom:6px">Diet</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="settings-diet">
+      ${['omnivore','vegetarian','vegan','pescatarian','keto','paleo'].map(d=>`<div class="ob-chip${diet===d?' selected':''}" data-val="${d}" onclick="document.querySelectorAll('#settings-diet .ob-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">${d}</div>`).join('')}
+    </div>
+    <div style="font-size:11px;font-weight:500;color:var(--ink3);margin-bottom:6px">Household</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px" id="settings-household">
+      ${[['solo','Just me'],['couple','Couple'],['family','Family'],['large','Large household']].map(([v,l])=>`<div class="ob-chip${household===v?' selected':''}" data-val="${v}" onclick="document.querySelectorAll('#settings-household .ob-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">${l}</div>`).join('')}
+    </div>
+    <div style="font-size:11px;font-weight:500;color:var(--ink3);margin-bottom:6px">Default recipe privacy</div>
+    <div style="display:flex;gap:6px;margin-bottom:20px" id="settings-privacy">
+      <div class="ob-chip${defaultPrivate?' selected':''}" data-val="private" onclick="document.querySelectorAll('#settings-privacy .ob-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🔒 Private</div>
+      <div class="ob-chip${!defaultPrivate?' selected':''}" data-val="public" onclick="document.querySelectorAll('#settings-privacy .ob-chip').forEach(c=>c.classList.remove('selected'));this.classList.add('selected')">🌍 Public</div>
+    </div>
+    <div style="font-size:11px;color:var(--ink4);margin-bottom:16px">Signed in as <strong>${currentUser?.email||''}</strong></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button onclick="document.getElementById('settings-modal').remove()" style="padding:8px 16px;border:1px solid var(--paper3);border-radius:var(--r);background:none;cursor:pointer;font-size:12px;color:var(--ink3)">Cancel</button>
+      <button onclick="saveAccountSettings()" class="btn-primary" style="padding:8px 18px" id="settings-save-btn">Save changes</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+
+async function saveAccountSettings(){
+  const btn=document.getElementById('settings-save-btn');
+  btn.textContent='Saving…';btn.disabled=true;
+  const name=document.getElementById('settings-name').value.trim();
+  const diet=document.querySelector('#settings-diet .ob-chip.selected')?.dataset.val||'omnivore';
+  const household=document.querySelector('#settings-household .ob-chip.selected')?.dataset.val||'family';
+  const defaultPrivate=document.querySelector('#settings-privacy .ob-chip.selected')?.dataset.val==='private';
+  try{
+    await dbPatch('/api/auth/profile',{display_name:name,diet,household,default_private:defaultPrivate});
+    currentProfile={...currentProfile,display_name:name,diet,household,default_private:defaultPrivate};
+    updateUserUI();
+    document.getElementById('settings-modal').remove();
+    showToast('Settings saved');
+  }catch(e){btn.textContent='Save changes';btn.disabled=false;showToast('Could not save settings');}
+}
 function toggleRecipePrivacy(){
   if(!cbRecipe||!authToken)return;
   const newPublic=!cbRecipe.is_public;
