@@ -374,6 +374,16 @@ app.delete('/api/planner/:week/:day/:meal', requireAuth(async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
 
+// Debug: test profile upsert for authenticated user
+app.get('/api/debug/profile', requireAuth(async (req, res) => {
+  const { data: existing } = await supabaseAdmin.from('user_profiles').select('*').eq('id', req.user.id).single();
+  const { data: upserted, error } = await supabaseAdmin
+    .from('user_profiles')
+    .upsert({ id: req.user.id, diet: 'omnivore', household: 'family', onboarding_done: true }, { onConflict: 'id' })
+    .select().single();
+  res.json({ user_id: req.user.id, existing_before: existing, upsert_result: upserted, upsert_error: error?.message });
+}));
+
 app.get('*', (_req, res) => res.sendFile(join(__dirname, 'public', 'index.html')));
 
 app.use((err, _req, res, _next) => {

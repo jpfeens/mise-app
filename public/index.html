@@ -1740,7 +1740,8 @@ async function obFinish(){
     currentProfile={...currentProfile,diet:obData.diet,household:obData.household,
       default_private:obData.defaultPrivacy==='private',onboarding_done:true};
   }catch(e){
-    console.warn('obFinish: profile save failed', e);
+    console.warn('obFinish: profile save failed', e.message, e);
+    showToast('Profile error: '+e.message);
     if(!currentProfile)currentProfile={};
     currentProfile.onboarding_done=true;
   }
@@ -1758,7 +1759,8 @@ async function obFinish(){
         recipes=[...saved.map(rowToRecipe),...recipes];
       }
     }catch(e){
-      console.warn('obFinish: starter recipes failed', e);
+      console.warn('obFinish: starter recipes failed', e.message, e);
+      showToast('Recipes error: '+e.message);
     }
   }
 
