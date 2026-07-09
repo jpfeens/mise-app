@@ -152,14 +152,26 @@ app.patch('/api/auth/profile', requireAuth(async (req, res) => {
   const allowed = ['display_name','diet','household','default_private','onboarding_done'];
   const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
   console.log('PATCH /api/auth/profile user:', req.user.id, 'updates:', updates);
-  // Use admin client for upsert to bypass RLS insert restriction on new rows
-  const { data, error } = await supabaseAdmin
+
+  // Race the DB call against a timeout
+  const dbCall = supabaseAdmin
     .from('user_profiles')
     .upsert({ id: req.user.id, ...updates }, { onConflict: 'id' })
     .select().single();
-  console.log('profile upsert result:', { data, error });
-  if (error) return res.status(500).json({ error: 'Could not update profile.', detail: error.message });
-  res.json(data);
+
+  const timeout = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error('DB timeout')), 5000)
+  );
+
+  try {
+    const { data, error } = await Promise.race([dbCall, timeout]);
+    console.log('profile upsert result:', { data: !!data, error: error?.message });
+    if (error) return res.status(500).json({ error: 'Could not update profile.', detail: error.message });
+    res.json(data);
+  } catch (e) {
+    console.error('profile upsert failed:', e.message);
+    res.status(500).json({ error: e.message });
+  }
 }));
 
 // ══════════════════════════════════════════════════════════════
