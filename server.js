@@ -139,39 +139,53 @@ app.post('/api/auth/signout', requireAuth(async (req, res) => {
 }));
 
 app.get('/api/auth/me', requireAuth(async (req, res) => {
+  // Try to get existing profile
   const { data, error } = await userClient(req)
     .from('user_profiles').select('*').eq('id', req.user.id).single();
-  if (error) return res.status(404).json({ error: 'Profile not found' });
-  res.json({ user: req.user, profile: data });
+
+  if (data) return res.json({ user: req.user, profile: data });
+
+  // Profile missing — create it now using admin client
+  const display_name = req.user.email?.split('@')[0] || 'User';
+  const { data: created, error: createError } = await supabaseAdmin
+    .from('user_profiles')
+    .insert({ id: req.user.id, display_name, onboarding_done: false })
+    .select().single();
+
+  if (createError) {
+    console.error('Failed to create profile:', createError.message);
+    return res.status(500).json({ error: 'Could not create profile' });
+  }
+  res.json({ user: req.user, profile: created });
 }));
 
-// ══════════════════════════════════════════════════════════════
-// USER PROFILE — preferences & onboarding
-// ══════════════════════════════════════════════════════════════
 app.patch('/api/auth/profile', requireAuth(async (req, res) => {
   const allowed = ['display_name','diet','household','default_private','onboarding_done'];
   const updates = Object.fromEntries(Object.entries(req.body).filter(([k]) => allowed.includes(k)));
   console.log('PATCH /api/auth/profile user:', req.user.id, 'updates:', updates);
 
-  // Race the DB call against a timeout
-  const dbCall = supabaseAdmin
+  // Try update with user client first (respects RLS, row must exist)
+  const { data, error } = await userClient(req)
     .from('user_profiles')
-    .upsert({ id: req.user.id, ...updates }, { onConflict: 'id' })
+    .update(updates)
+    .eq('id', req.user.id)
     .select().single();
 
-  const timeout = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('DB timeout')), 5000)
-  );
-
-  try {
-    const { data, error } = await Promise.race([dbCall, timeout]);
-    console.log('profile upsert result:', { data: !!data, error: error?.message });
-    if (error) return res.status(500).json({ error: 'Could not update profile.', detail: error.message });
-    res.json(data);
-  } catch (e) {
-    console.error('profile upsert failed:', e.message);
-    res.status(500).json({ error: e.message });
+  if (data) {
+    console.log('profile updated via user client');
+    return res.json(data);
   }
+
+  // Row might not exist — upsert with admin client
+  console.log('update failed, trying admin upsert:', error?.message);
+  const { data: upserted, error: upsertError } = await supabaseAdmin
+    .from('user_profiles')
+    .upsert({ id: req.user.id, display_name: req.user.email?.split('@')[0] || 'User', ...updates }, { onConflict: 'id' })
+    .select().single();
+
+  console.log('admin upsert result:', { ok: !!upserted, error: upsertError?.message });
+  if (upsertError) return res.status(500).json({ error: upsertError.message });
+  res.json(upserted);
 }));
 
 // ══════════════════════════════════════════════════════════════
@@ -197,10 +211,13 @@ app.post('/api/recipes/bulk', requireAuth(async (req, res) => {
   const { recipes } = req.body;
   if (!Array.isArray(recipes) || !recipes.length) return res.status(400).json({ error: 'recipes array required' });
   const rows = recipes.map(r => ({ ...sanitiseRecipe(r), user_id: req.user.id }));
-  console.log('POST /api/recipes/bulk user:', req.user.id, 'count:', rows.length, 'first recipe:', rows[0]?.name);
+  console.log('POST /api/recipes/bulk user:', req.user.id, 'count:', rows.length);
   const { data, error } = await userClient(req).from('recipes').insert(rows).select();
-  console.log('bulk insert result:', { count: data?.length, error: error?.message });
-  if (error) return res.status(500).json({ error: 'Could not save recipes.', detail: error.message });
+  if (error) {
+    console.error('bulk insert error:', error.message, error.details, error.hint);
+    return res.status(500).json({ error: error.message });
+  }
+  console.log('bulk insert success:', data?.length, 'recipes');
   res.status(201).json(data);
 }));
 

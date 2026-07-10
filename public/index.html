@@ -1733,39 +1733,44 @@ function obSkip(){
 }
 
 async function obFinish(){
-  // Dismiss the modal immediately — don't make the user wait for DB
+  // Dismiss immediately so user isn't blocked
   hideOnboarding();
-  filterRecipes();
-  updateCounts();
 
-  // Save profile + seed recipes in the background
   const diet=obData.diet;
   const household=obData.household;
   const defaultPrivate=obData.defaultPrivacy==='private';
   const wantStarters=obData.starterRecipes==='yes';
 
-  // Fire profile save without awaiting in the UI
-  dbPatch('/api/auth/profile',{
-    diet,household,default_private:defaultPrivate,onboarding_done:true
-  }).then(r=>{
-    console.log('Profile saved',r);
+  // Save profile
+  try{
+    const r=await dbPatch('/api/auth/profile',{
+      diet,household,default_private:defaultPrivate,onboarding_done:true
+    });
+    console.log('Profile saved OK',r);
     currentProfile={...currentProfile,diet,household,default_private:defaultPrivate,onboarding_done:true};
-  }).catch(e=>console.warn('Profile save failed (non-blocking)',e.message));
+  }catch(e){
+    console.error('Profile save error:',e.message);
+    showToast('Could not save profile: '+e.message);
+  }
 
   // Seed starter recipes
   if(wantStarters){
-    const starters=getStarterRecipes(diet,household);
-    const isPublic=!defaultPrivate;
-    dbPost('/api/recipes/bulk',{recipes:starters.map(r=>({...r,is_public:isPublic}))})
-      .then(saved=>{
-        console.log('Starter recipes saved',saved?.length);
-        if(saved?.length){
-          recipes=[...saved.map(rowToRecipe),...recipes];
-          filterRecipes();updateCounts();
-          showToast(`${saved.length} starter recipes added to your library 🎉`);
-        }
-      })
-      .catch(e=>console.warn('Starter recipes failed (non-blocking)',e.message));
+    try{
+      showToast('Adding starter recipes…');
+      const starters=getStarterRecipes(diet,household);
+      console.log('Seeding',starters.length,'starters, diet:',diet,'household:',household);
+      const rows=starters.map(r=>({...r,is_public:!defaultPrivate}));
+      const saved=await dbPost('/api/recipes/bulk',{recipes:rows});
+      console.log('Bulk save OK:',saved?.length,'recipes');
+      if(saved?.length){
+        recipes=[...saved.map(rowToRecipe),...recipes];
+        filterRecipes();updateCounts();
+        showToast(`${saved.length} starter recipes added 🎉`);
+      }
+    }catch(e){
+      console.error('Starter recipes error:',e.message);
+      showToast('Starter recipes failed: '+e.message);
+    }
   }
 }
 
