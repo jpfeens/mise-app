@@ -318,7 +318,49 @@ app.delete('/api/planner/:week/:day/:meal', async (req, res) => {
 // ══════════════════════════════════════════════════════════════
 // HEALTH + FALLBACK
 // ══════════════════════════════════════════════════════════════
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+app.get('/api/test', async (req, res) => {
+  const results = {};
+
+  // 1. Can we reach Supabase at all?
+  try {
+    const { data, error } = await adminClient.from('user_profiles').select('count').limit(1);
+    results.supabase_admin = error ? `ERROR: ${error.message}` : 'OK';
+  } catch(e) { results.supabase_admin = `EXCEPTION: ${e.message}`; }
+
+  // 2. Is service key set?
+  results.service_key_set = !!process.env.SUPABASE_SERVICE_KEY;
+  results.supabase_url = process.env.SUPABASE_URL?.slice(0,40) + '...';
+
+  // 3. Is the user authenticated?
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.slice(7);
+      const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: { headers: { Authorization: `Bearer ${token}` } }
+      });
+      const { data: { user }, error } = await client.auth.getUser();
+      if (error || !user) {
+        results.auth = `INVALID TOKEN: ${error?.message}`;
+      } else {
+        results.auth = `OK - user: ${user.id}`;
+        // 4. Try to read their profile
+        const { data: profile, error: pe } = await client.from('user_profiles').select('*').eq('id', user.id).single();
+        results.profile_read = profile ? `OK - onboarding_done: ${profile.onboarding_done}` : `ERROR: ${pe?.message}`;
+        // 5. Try to update their profile
+        const { data: updated, error: ue } = await client.from('user_profiles').update({ diet: 'omnivore' }).eq('id', user.id).select().single();
+        results.profile_update_user_client = updated ? 'OK' : `ERROR: ${ue?.message}`;
+        // 6. Try admin update
+        const { data: adminUpdated, error: ae } = await adminClient.from('user_profiles').update({ diet: 'omnivore' }).eq('id', user.id).select().single();
+        results.profile_update_admin_client = adminUpdated ? 'OK' : `ERROR: ${ae?.message}`;
+      }
+    } catch(e) { results.auth = `EXCEPTION: ${e.message}`; }
+  } else {
+    results.auth = 'No Authorization header - pass your token to test authenticated paths';
+  }
+
+  res.json(results);
+});
 app.get('*', (_req, res) => res.sendFile(join(__dirname, 'public', 'index.html')));
 app.use((err, _req, res, _next) => { console.error('Unhandled:', err); res.status(500).json({ error: 'Internal server error' }); });
 
