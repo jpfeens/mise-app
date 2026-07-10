@@ -763,19 +763,34 @@ let currentCat='all',activeTagFilter='',activeProfileFilter='all';
 let currentUser=null,currentProfile=null,authToken=null;
 
 function getAuthHeaders(){return authToken?{'Content-Type':'application/json','Authorization':'Bearer '+authToken}:{'Content-Type':'application/json'};}
-async function dbGet(p){const r=await fetch(p,{headers:getAuthHeaders()});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||r.status);}return r.json();}
-async function dbPost(p,b){const r=await fetch(p,{method:'POST',headers:getAuthHeaders(),body:JSON.stringify(b)});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||r.status);}return r.json();}
+
+async function apiFetch(path, opts={}){
+  const r=await fetch(path,{...opts,headers:{...getAuthHeaders(),...(opts.headers||{})}});
+  if(r.status===401){
+    // Token expired — sign out and show landing
+    console.warn('Auth token expired, signing out');
+    authToken=null;localStorage.removeItem('rish_token');
+    showLanding();
+    showToast('Session expired — please sign in again');
+    throw new Error('Session expired');
+  }
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||`HTTP ${r.status}`);}
+  return r.json();
+}
+async function dbGet(p){return apiFetch(p);}
+async function dbPost(p,b){return apiFetch(p,{method:'POST',body:JSON.stringify(b)});}
 async function dbPatch(p,b,timeoutMs=8000){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   try{
     const r=await fetch(p,{method:'PATCH',headers:getAuthHeaders(),body:JSON.stringify(b),signal:controller.signal});
     clearTimeout(timer);
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||r.status);}
+    if(r.status===401){authToken=null;localStorage.removeItem('rish_token');showLanding();showToast('Session expired — please sign in again');throw new Error('Session expired');}
+    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||`HTTP ${r.status}`);}
     return r.json();
   }catch(e){clearTimeout(timer);throw e;}
 }
-async function dbDelete(p){const r=await fetch(p,{method:'DELETE',headers:getAuthHeaders()});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||r.status);}return r.json();}
+async function dbDelete(p){return apiFetch(p,{method:'DELETE'});}
 
 // Map Supabase snake_case row → camelCase recipe object used in the UI
 function rowToRecipe(row){
@@ -794,8 +809,8 @@ function rowToRecipe(row){
 
 function recipeToRow(r){
   return{
-    name:r.name, cats:r.cats||[r.cat||'dinner'], src:r.src||'manual',
-    time:r.time, base_servings:r.baseServings||2,
+    name:r.name, cats:r.cats||[r.cat||'dinner'], emoji:r.emoji||'🍽️', src:r.src||'manual',
+    time:r.time||'30 min', base_servings:r.baseServings||2,
     time_made:r.timeMade||0, rating:r.rating||0, notes:r.notes||'',
     tags:r.tags||[], family_profiles:r.profiles||[], edits:r.edits||[],
     photo_url:r.photoUrl||'',
@@ -836,7 +851,10 @@ function persistRecipe(id, fields){
   if('photoUrl' in fields)row.photo_url=fields.photoUrl;
   if('ings' in fields)row.ings=fields.ings;
   if('steps' in fields)row.steps=fields.steps;
-  dbPatch(`/api/recipes/${id}`,row).catch(e=>console.warn('Persist failed',e));
+  dbPatch(`/api/recipes/${id}`,row).catch(e=>{
+    console.error('Persist failed for',id,':',e.message);
+    showToast('⚠️ Could not save change: '+e.message);
+  });
 }
 const catThumbs={breakfast:"thumb-b",lunch:"thumb-l",dinner:"thumb-d",snack:"thumb-s",dessert:"thumb-e"};
 const catPlateColors={breakfast:"#fde8c8",lunch:"#d4edbe",dinner:"#c8deff",snack:"#fdd9ca",dessert:"#f8c8e4"};
@@ -1440,10 +1458,25 @@ async function saveExtracted(r){
   const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
   const emoji=r.emoji||catEmoji[cats[0]]||'🍽️';
   const newRecipe={id:Date.now(),name:r.name,cats,src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:'',sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
-  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;showToast('Recipe saved!');
+  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;
   fetchRecipePhoto(newRecipe.id, newRecipe.name, newRecipe.cats, emoji);
-  estimateMacros(newRecipe.id);
-  try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
+  try{
+    const row={...recipeToRow(newRecipe),emoji};
+    const saved=await dbPost('/api/recipes',row);
+    if(saved&&saved.id){
+      const idx=recipes.findIndex(x=>x.id===newRecipe.id);
+      if(idx>=0)recipes[idx].id=saved.id;
+      showToast('Recipe saved!');
+      estimateMacros(saved.id);
+    }
+  }catch(e){
+    console.error('Save to DB failed:',e.message);
+    showToast('⚠️ Recipe not saved: '+e.message);
+    // Remove from local array since it's not persisted
+    const idx=recipes.findIndex(x=>x.id===newRecipe.id);
+    if(idx>=0)recipes.splice(idx,1);
+    filterRecipes();
+  }
 }
 // Category emoji placeholders — used immediately while photo loads, and as fallback
 const catEmoji={breakfast:'🍳',lunch:'🥗',dinner:'🍽️',snack:'🍎',dessert:'🍰'};
