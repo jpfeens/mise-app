@@ -549,6 +549,11 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);co
       <div style="font-size:11px;color:var(--ink4);margin-bottom:10px">Recipes shared by the Rish community. Like them or save to your library.</div>
       <div id="community-list"><div style="text-align:center;padding:20px;color:var(--ink4);font-size:12px"><i class="ti ti-loader spinner"></i> Loading…</div></div>
     </div>
+    <div id="panel-profile" style="display:none" class="panel-body">
+      <div class="section-lbl">Your profile</div>
+      <div id="profile-panel-content"><div style="text-align:center;padding:20px;color:var(--ink4);font-size:12px">Loading…</div></div>
+      <button class="btn-ghost" style="width:100%;justify-content:center;margin-top:10px" onclick="openAccountSettings()"><i class="ti ti-settings"></i> Account settings</button>
+    </div>
     </div>
   </div>
 <!-- ═══════ LANDING PAGE ═══════ -->
@@ -902,7 +907,7 @@ function renderGrid(list){
       photo=`<div class="rc-photo-placeholder ${catThumbs[primaryCat]}" style="background:var(--paper3);display:flex;align-items:center;justify-content:center;font-size:42px">${catEmoji[primaryCat]||'🍽️'}</div>`;
     }
     const catPillsHtml=r.cats.slice(0,2).map(c=>`<span class="cat-pill ${catPills[c]||'cpd'}">${c}</span>`).join('');
-    return`<div class="rc" onclick="openCookbook(${r.id})"><div class="rc-edit-btn" onclick="event.stopPropagation();openCookbook(${r.id},true)"><i class="ti ti-pencil"></i></div>${wear}<div class="rc-photo">${photo}<div class="rc-photo-overlay"></div><div class="profile-stack">${avatars}</div>${flag}</div><div class="rc-body"><div class="rc-name">${r.name}</div><div class="rc-meta"><div class="src-dot ${srcDot[r.src]}"></div><span class="rc-time">${r.time}</span></div><div class="rc-stars">${starHTML(r.rating||0)}</div><div class="rc-tags">${catPillsHtml}${tags}</div></div></div>`;
+    return`<div class="rc" onclick="openCookbook('${r.id}')"><div class="rc-edit-btn" onclick="event.stopPropagation();openCookbook('${r.id}',true)"><i class="ti ti-pencil"></i></div>${wear}<div class="rc-photo">${photo}<div class="rc-photo-overlay"></div><div class="profile-stack">${avatars}</div>${flag}</div><div class="rc-body"><div class="rc-name">${r.name}</div><div class="rc-meta"><div class="src-dot ${srcDot[r.src]}"></div><span class="rc-time">${r.time}</span></div><div class="rc-stars">${starHTML(r.rating||0)}</div><div class="rc-tags">${catPillsHtml}${tags}</div></div></div>`;
   }).join('');
   updateCounts();
 }
@@ -1080,7 +1085,7 @@ async function sendDiscoverM(prefill){
   discoverLoading=false;chat.scrollTop=chat.scrollHeight;
 }
 let cbRecipe=null,cbServings=2,cbTab='recipe',cbEditDraft=null,cbCheckedIngs=new Set();
-function openCookbook(id,startInEdit){cbRecipe=recipes.find(r=>r.id===id);cbServings=cbRecipe.baseServings;cbTab=startInEdit?'edit':'recipe';cbCheckedIngs=new Set();renderCookbook();document.getElementById('cookbook-overlay').style.display='flex';}
+function openCookbook(id,startInEdit){cbRecipe=recipes.find(r=>String(r.id)===String(id));cbServings=cbRecipe.baseServings;cbTab=startInEdit?'edit':'recipe';cbCheckedIngs=new Set();renderCookbook();document.getElementById('cookbook-overlay').style.display='flex';}
 function closeCookbook(){document.getElementById('cookbook-overlay').style.display='none';cbRecipe=null;cbEditDraft=null;}
 function switchCbTab(tab){if(tab==='edit')beginCbEdit();cbTab=tab;document.querySelectorAll('.cb-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));renderCbTabBody();}
 function renderCookbook(){
@@ -1367,16 +1372,18 @@ async function callExtract(messages, max_tokens=1500){
     const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens,messages})});
     const data=await res.json();
     if(!res.ok){
-      const detail=data?.error||data?.details?.error?.message||`HTTP ${res.status}`;
-      showImportError(`API error: ${detail}`);
+      showImportError(`API error: ${data?.error||'Unknown error'}`);
       return;
     }
     const text=data.content?.map(b=>b.text||'').join('')||'';
-    if(!text){showImportError('No response from Claude. Try again.');return;}
+    if(!text){
+      showImportError(`No text in response. Stop reason: ${data.stop_reason||'unknown'}. Check Railway logs.`);
+      return;
+    }
     handleExtractResult(text);
   }catch(e){
     console.error('callExtract error:',e);
-    showImportError('Something went wrong. Check your connection.');
+    showImportError('Network error: '+e.message);
   }
 }
 // Holds the last extracted recipe so Preview and Save both work
@@ -1561,7 +1568,7 @@ function resetImport(){
   importCtx='';
 }
 function openImport(){navTo('import');}
-function showPanelTab(tab){const tabs=['import','planner','grocery','pantry','discover','community','profile'];tabs.forEach(t=>{const p=document.getElementById('panel-'+t),tb=document.getElementById('tab-'+t);if(!p)return;const active=t===tab;if(tb)tb.classList.toggle('active',active);p.style.display=active?'flex':'none';if(active){p.style.flexDirection='column';if(t==='planner')renderPlanner();if(t==='grocery')renderGroceryList();if(t==='community')loadCommunity();}});}
+function showPanelTab(tab){const tabs=['import','planner','grocery','pantry','discover','community','profile'];tabs.forEach(t=>{const p=document.getElementById('panel-'+t),tb=document.getElementById('tab-'+t);if(!p)return;const active=t===tab;if(tb)tb.classList.toggle('active',active);p.style.display=active?'flex':'none';if(active){p.style.flexDirection='column';if(t==='planner')renderPlanner();if(t==='grocery')renderGroceryList();if(t==='community')loadCommunity();if(t==='profile')renderProfilePanel();}});}
 function fmtAmt(ing,ratio){if(ing.qty==null)return ing.amt;const scaled=ing.qty*ratio;if(ing.unit==='g'||ing.unit==='ml'){if(scaled>=1000&&ing.unit==='ml')return(scaled/1000).toFixed(1)+'L';if(scaled>=1000&&ing.unit==='g')return(scaled/1000).toFixed(1)+'kg';return Math.round(scaled)+ing.unit;}const fracs={0.25:'\u00BC',0.5:'\u00BD',0.75:'\u00BE'};const whole=Math.floor(scaled);const frac=Math.round((scaled-whole)*4)/4;return((whole||'')+(fracs[frac]||'')||String(scaled))+(ing.unit?' '+ing.unit:'');}
 function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function escAttr(s){return(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
@@ -1813,7 +1820,56 @@ function getStarterRecipes(diet,household){
   return lib.slice(0,10).map(r=>({...r,base_servings:servings,src:'manual',time_made:0,rating:0,notes:'',family_profiles:[],edits:[]}));
 }
 
-// ── Community ─────────────────────────────────────────────────
+function renderProfilePanel(){
+  const el=document.getElementById('profile-panel-content');
+  if(!el)return;
+  const name=currentProfile?.display_name||currentUser?.email?.split('@')[0]||'You';
+  const diet=currentProfile?.diet||'omnivore';
+  const household=currentProfile?.household||'family';
+  const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  // Load saved family members from localStorage
+  let family=[];
+  try{family=JSON.parse(localStorage.getItem('rish_family')||'[]');}catch(e){}
+
+  const familyHtml=family.map((m,i)=>`
+    <div style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid var(--paper3);border-radius:var(--r2);background:var(--paper)">
+      <div style="width:32px;height:32px;border-radius:50%;background:${m.color};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">${m.emoji}</div>
+      <div style="flex:1;min-width:0"><div style="font-weight:500;font-size:12px">${m.name}</div><div style="font-size:10px;color:var(--ink4)">${m.diet||'No preference set'}</div></div>
+      <button onclick="removeFamilyMember(${i})" style="border:none;background:none;cursor:pointer;color:var(--ink4);font-size:14px;padding:2px 5px">&times;</button>
+    </div>`).join('');
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--accent);border-radius:var(--r2);background:var(--accent-light);margin-bottom:14px">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0">${initials}</div>
+      <div><div style="font-weight:600;font-size:13px">${name}</div><div style="font-size:11px;color:var(--ink3)">${diet} · ${household}</div></div>
+    </div>
+    ${household!=='solo'?`
+    <div class="section-lbl">Family members</div>
+    <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px">${familyHtml}
+      <button onclick="addFamilyMember()" class="btn-ghost" style="width:100%;justify-content:center;font-size:11px"><i class="ti ti-plus"></i> Add family member</button>
+    </div>`:''}`;
+}
+
+function addFamilyMember(){
+  const name=prompt('Name of family member:');
+  if(!name||!name.trim())return;
+  const diet=prompt('Diet? (omnivore / vegetarian / vegan / pescatarian / keto / paleo)','omnivore');
+  const emojis=['👩','👨','🧒','👦','👧','🧑','👴','👵'];
+  const colors=['#fde8c8','#d4edbe','#c8deff','#f5d6e8','#e8d6f5','#d6f5e8'];
+  let family=[];
+  try{family=JSON.parse(localStorage.getItem('rish_family')||'[]');}catch(e){}
+  family.push({name:name.trim(),diet:diet||'omnivore',emoji:emojis[family.length%emojis.length],color:colors[family.length%colors.length]});
+  localStorage.setItem('rish_family',JSON.stringify(family));
+  renderProfilePanel();
+}
+
+function removeFamilyMember(idx){
+  let family=[];
+  try{family=JSON.parse(localStorage.getItem('rish_family')||'[]');}catch(e){}
+  family.splice(idx,1);
+  localStorage.setItem('rish_family',JSON.stringify(family));
+  renderProfilePanel();
+}
 async function loadCommunity(){
   const list=document.getElementById('community-list');if(!list)return;
   list.innerHTML='<div style="text-align:center;padding:20px;color:var(--ink4);font-size:12px"><i class="ti ti-loader spinner"></i> Loading…</div>';

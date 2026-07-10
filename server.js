@@ -47,6 +47,9 @@ async function requireAuth(req, res) {
 // CLAUDE PROXY
 // ══════════════════════════════════════════════════════════════
 app.post('/api/claude', async (req, res) => {
+  if (!process.env.ANTHROPIC_API_KEY) {
+    return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not set in Railway environment variables' });
+  }
   const { model, messages, system, max_tokens } = req.body;
   if (!messages?.length) return res.status(400).json({ error: 'messages required' });
   const hasPdf = messages.some(m => Array.isArray(m.content) && m.content.some(b => b.type === 'document' && b.source?.media_type === 'application/pdf'));
@@ -57,9 +60,15 @@ app.post('/api/claude', async (req, res) => {
       body: JSON.stringify({ model: model || 'claude-sonnet-4-6', max_tokens: max_tokens || 1500, messages, ...(system && { system }) })
     });
     const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: data?.error?.message || 'Anthropic error' });
+    if (!r.ok) {
+      console.error('Anthropic API error:', r.status, data);
+      return res.status(r.status).json({ error: data?.error?.message || 'Anthropic API error', details: data });
+    }
     res.json(data);
-  } catch (e) { res.status(502).json({ error: 'Could not reach Anthropic API' }); }
+  } catch (e) {
+    console.error('Claude proxy error:', e.message);
+    res.status(502).json({ error: 'Could not reach Anthropic API: ' + e.message });
+  }
 });
 
 // ══════════════════════════════════════════════════════════════
