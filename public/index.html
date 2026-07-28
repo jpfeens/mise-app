@@ -20,7 +20,8 @@
   --shadow2:0 2px 8px rgba(0,0,0,.08),0 8px 24px rgba(0,0,0,.06);
   --sidebar-w:180px;--panel-w:265px
 }
-html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);color:var(--ink);font-size:13px}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--paper2);color:var(--ink);font-size:13px;user-select:none;-webkit-user-select:none}
+input,textarea,select{user-select:text;-webkit-user-select:text}
 .app{display:flex;height:100vh;overflow:hidden;background:var(--paper);position:relative}
 .sidebar{width:var(--sidebar-w);background:var(--ink);display:flex;flex-direction:column;flex-shrink:0;transition:transform .25s}
 .logo{padding:18px 16px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
@@ -1392,33 +1393,40 @@ function closePreviewCookbook(){
 }
 function showImportError(msg){const sfx=importCtx?'-'+importCtx:'';document.getElementById('import-result-area'+sfx).innerHTML=`<div style="padding:10px;border-radius:var(--r2);background:var(--danger-light);color:var(--danger);font-size:12px">${msg}</div><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Try again</button>`;}
 async function saveExtracted(r){
+  if(!r){showToast('Nothing to save');return;}
   let src='manual',sourceLabel=r.sourceLabel||'',sourceUrl='';
   if(importMode==='url'){src='url';sourceUrl=lastImportUrl||'';if(!sourceLabel)sourceLabel=sourceUrl;}
   else if(importMode==='screenshots'){src='screenshot';if(!sourceLabel)sourceLabel='Imported from screenshots';}
   else if(importMode==='photo'){src='photo';if(!sourceLabel)sourceLabel='Imported from a photo';}
   else if(importMode==='pdf'){src='manual';if(!sourceLabel)sourceLabel='Imported from PDF';}
-  else{src='manual';if(!sourceLabel)sourceLabel='Added manually';}
   const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
   const emoji=r.emoji||catEmoji[cats[0]]||'🍽️';
-  const newRecipe={id:Date.now(),name:r.name,cats,src,time:r.time,baseServings:r.baseServings||2,timeMade:0,rating:0,notes:'',tags:r.tags||[],profiles:[],edits:[],photoUrl:'',sourceLabel,sourceUrl,ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:r.steps||[]};
-  recipes.push(newRecipe);filterRecipes();resetImport();pendingExtractedRecipe=null;pendingSourceImageData=null;
-  fetchRecipePhoto(newRecipe.id, newRecipe.name, newRecipe.cats, emoji);
+  // Build the row to send to DB first — don't touch local state yet
+  const row={
+    name:r.name, cats, emoji, src,
+    time:r.time||'30 min', base_servings:r.baseServings||2,
+    time_made:0, rating:0, notes:'', tags:r.tags||[],
+    family_profiles:[], edits:[], photo_url:'',
+    source_label:sourceLabel, source_url:sourceUrl,
+    ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),
+    steps:r.steps||[], is_public:false
+  };
   try{
-    const row={...recipeToRow(newRecipe),emoji};
     const saved=await dbPost('/api/recipes',row);
-    if(saved&&saved.id){
-      const idx=recipes.findIndex(x=>x.id===newRecipe.id);
-      if(idx>=0)recipes[idx].id=saved.id;
-      showToast('Recipe saved!');
-      estimateMacros(saved.id);
-    }
+    if(!saved||!saved.id)throw new Error('No ID returned from server');
+    // Build local recipe from what DB returned
+    const newRecipe=rowToRecipe(saved);
+    newRecipe.photoUrl='emoji:'+emoji;
+    recipes.unshift(newRecipe); // add to front
+    pendingExtractedRecipe=null;
+    resetImport();
+    filterRecipes();
+    showToast('Recipe saved! Tap it to view.');
+    fetchRecipePhoto(saved.id, saved.name, newRecipe.cats, emoji);
+    estimateMacros(saved.id);
   }catch(e){
     console.error('Save to DB failed:',e.message);
-    showToast('⚠️ Recipe not saved: '+e.message);
-    // Remove from local array since it's not persisted
-    const idx=recipes.findIndex(x=>x.id===newRecipe.id);
-    if(idx>=0)recipes.splice(idx,1);
-    filterRecipes();
+    showToast('⚠️ Not saved: '+e.message);
   }
 }
 // Immediately give the recipe an emoji placeholder so the card isn't blank,
