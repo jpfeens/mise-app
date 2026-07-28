@@ -1216,39 +1216,174 @@ function buildDiscoverProfileContext(){
 const DISCOVER_SYSTEM=`You are a recipe discovery assistant for a recipe app.
 When the user tells you what they want, return ONLY this JSON (no prose, no markdown):
 {"found":true,"search_description":"one sentence describing what you found and why","recipe":{"name":"...","category":"breakfast|lunch|dinner|snack|dessert","emoji":"single emoji matching this specific dish e.g. 🍪 cookies 🍕 pizza 🍜 noodles 🥩 steak","time":"e.g. 35 min","baseServings":4,"tags":["tag1","tag2"],"ingredients":[{"amt":"2 cups","unit":"cup","qty":2,"name":"flour"}],"steps":["Step text."]}}
-If nothing fits: {"found":false,"message":"brief explanation"}`;
+If nothing fits: {"found":false,"message":"brief explanation"}
+When asked to "keep looking" or "try again", suggest a DIFFERENT recipe — never repeat one you already suggested in this conversation.`;
+
 let discoverLoading=false;
+let discoverHistory=[]; // tracks conversation for keep-looking
+let lastDiscoverText=''; // original request for re-runs
+
 async function sendDiscover(prefill){
-  const input=document.getElementById('discover-input');const text=prefill||input.value.trim();if(!text||discoverLoading)return;
-  input.value='';discoverLoading=true;document.getElementById('discover-send').disabled=true;
-  const chat=document.getElementById('discover-chat');const chips=chat.querySelector('.hint-chips');if(chips)chips.style.display='none';
-  const um=document.createElement('div');um.className='msg user';um.textContent=text;chat.appendChild(um);
-  const am=document.createElement('div');am.className='msg ai loading';am.textContent='Finding a recipe for you\u2026';chat.appendChild(am);chat.scrollTop=chat.scrollHeight;
+  const input=document.getElementById('discover-input');
+  const text=prefill||input.value.trim();
+  if(!text||discoverLoading)return;
+  if(!prefill){input.value='';discoverHistory=[];lastDiscoverText=text;}
+  discoverLoading=true;
+  document.getElementById('discover-send').disabled=true;
+  const chat=document.getElementById('discover-chat');
+  const chips=chat.querySelector('.hint-chips');if(chips)chips.style.display='none';
+  // Only show user message bubble for new searches, not keep-looking re-runs
+  if(!prefill){
+    const um=document.createElement('div');um.className='msg user';um.textContent=text;chat.appendChild(um);
+  }
+  const am=document.createElement('div');am.className='msg ai loading';am.textContent='Finding a recipe for you\u2026';chat.appendChild(am);
+  chat.scrollTop=chat.scrollHeight;
   try{
     const profileCtx=buildDiscoverProfileContext();
-    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:DISCOVER_SYSTEM+profileCtx,messages:[{role:'user',content:text}]})});
-    const data=await res.json();const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    // Build messages array including history for keep-looking continuity
+    const messages=[...discoverHistory,{role:'user',content:text}];
+    const res=await fetch('/api/claude',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,system:DISCOVER_SYSTEM+profileCtx,messages})});
+    const data=await res.json();
+    const raw=data.content.map(b=>b.text||'').join('').replace(/```json|```/g,'').trim();
+    // Add to history for next keep-looking call
+    discoverHistory.push({role:'user',content:text});
+    discoverHistory.push({role:'assistant',content:raw});
     const result=JSON.parse(raw);
     if(result.found&&result.recipe){
-      const r=result.recipe;const photoUrl=`https://source.unsplash.com/400x300/?${encodeURIComponent(r.photoSearchQuery||r.name+' food')}`;
+      const r=result.recipe;
       am.className='msg ai';am.textContent=result.search_description||`Found: ${r.name}`;
       const card=document.createElement('div');card.className='discover-recipe-card';
-      card.innerHTML=`<div class="drc-photo"><img src="${photoUrl}" alt="${r.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentNode.style.background='var(--paper3)';this.remove()"></div><div class="drc-body"><div class="drc-title">${r.name}</div><div class="drc-meta"><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span> &nbsp;${r.time} &middot; ${r.baseServings} servings</div><div class="drc-ings">${(r.ingredients||[]).slice(0,5).map(i=>i.name).join(', ')}${r.ingredients&&r.ingredients.length>5?' &amp; more':''}</div><div class="drc-actions"><button class="btn-primary" style="flex:1;font-size:11px;justify-content:center" onclick="saveDiscoveredRecipe(this)">Save to library</button><button class="btn-ghost" style="font-size:11px" onclick="this.closest('.discover-recipe-card').remove()">Keep looking</button></div></div>`;
-      card.dataset.recipe=JSON.stringify({...r,photoUrl});chat.appendChild(card);
-    }else{am.className='msg ai';am.textContent=result.message||"Couldn't find a great match. Try describing differently.";}
-  }catch(e){am.className='msg ai';am.textContent='Something went wrong. Try again.';}
-  discoverLoading=false;document.getElementById('discover-send').disabled=false;chat.scrollTop=chat.scrollHeight;
+      // Store full recipe on card for preview/save
+      card.dataset.recipe=JSON.stringify(r);
+      const cats=[r.category||'dinner'];
+      const ingPreview=(r.ingredients||[]).slice(0,5).map(i=>i.name).join(', ')+(r.ingredients&&r.ingredients.length>5?' & more':'');
+      card.innerHTML=`
+        <div class="drc-body">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="font-size:28px">${r.emoji||catEmoji[r.category]||'🍽️'}</span>
+            <div><div class="drc-title">${r.name}</div>
+            <div class="drc-meta"><span class="cat-pill ${catPills[r.category]||'cpd'}">${r.category}</span> &nbsp;${r.time} · ${r.baseServings} servings</div></div>
+          </div>
+          <div class="drc-ings" style="margin-bottom:10px">${ingPreview}</div>
+          <div class="drc-actions">
+            <button class="btn-ghost" style="font-size:11px" onclick="previewDiscoveredRecipe(this)"><i class="ti ti-eye"></i> Preview</button>
+            <button class="btn-primary" style="flex:1;font-size:11px;justify-content:center" onclick="saveDiscoveredRecipe(this)"><i class="ti ti-bookmark"></i> Save</button>
+            <button class="btn-ghost" style="font-size:11px" onclick="keepLooking(this)"><i class="ti ti-refresh"></i> Keep looking</button>
+          </div>
+        </div>`;
+      chat.appendChild(card);
+    }else{
+      am.className='msg ai';am.textContent=result.message||"Couldn't find a great match. Try describing differently.";
+    }
+  }catch(e){
+    am.className='msg ai';am.textContent='Something went wrong. Try again.';
+    console.error('Discover error:',e);
+  }
+  discoverLoading=false;
+  document.getElementById('discover-send').disabled=false;
+  chat.scrollTop=chat.scrollHeight;
 }
-async function saveDiscoveredRecipe(btn){
-  const card=btn.closest('.discover-recipe-card');const raw=JSON.parse(card.dataset.recipe);
-  const newRecipe={id:Date.now(),name:raw.name,cats:raw.categories&&raw.categories.length?raw.categories:[raw.category||'dinner'],src:'url',time:raw.time,baseServings:raw.baseServings||2,timeMade:0,rating:0,notes:'',tags:raw.tags||[],profiles:[],edits:[],photoUrl:raw.photoUrl||'',sourceLabel:'Discovered via Rish',ings:(raw.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),steps:raw.steps||[]};
-  recipes.push(newRecipe);
-  filterRecipes(document.getElementById('search-inp').value);
-  card.innerHTML=`<div style="padding:14px 12px;font-size:12px;color:var(--success);display:flex;align-items:center;gap:8px"><i class="ti ti-check" style="font-size:16px"></i> Saved to your library!</div>`;
-  setTimeout(()=>card.remove(),2000);showToast(`${raw.name} saved!`);
-  if(!newRecipe.photoUrl) fetchRecipePhoto(newRecipe.id, newRecipe.name, newRecipe.cats, raw.emoji);
-  estimateMacros(newRecipe.id);
-  try{const saved=await dbPost('/api/recipes',recipeToRow(newRecipe));if(saved&&saved.id){const idx=recipes.findIndex(x=>x.id===newRecipe.id);if(idx>=0)recipes[idx].id=saved.id;}}catch(e){console.warn('Save to DB failed',e);}
+
+function keepLooking(btn){
+  // Remove the current card and ask Claude for something different
+  const card=btn.closest('.discover-recipe-card');
+  const r=JSON.parse(card.dataset.recipe);
+  card.remove();
+  // Ask again with explicit "not this one" message
+  sendDiscover(`Not that one. I already saw "${r.name}". Please suggest a completely different recipe for: ${lastDiscoverText}`);
+}
+
+function previewDiscoveredRecipe(btn){
+  const card=btn.closest('.discover-recipe-card');
+  const r=JSON.parse(card.dataset.recipe);
+  const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
+  // Build a temp recipe object and open the cookbook overlay
+  pendingExtractedRecipe={...r,categories:cats};
+  const temp={
+    id:'__preview__', name:r.name, cats,
+    src:'discover', time:r.time, baseServings:r.baseServings||2,
+    timeMade:0, rating:0, notes:'', tags:r.tags||[], profiles:[], edits:[],
+    photoUrl:'emoji:'+(r.emoji||catEmoji[cats[0]]||'🍽️'),
+    sourceLabel:'Discovered via Rish',
+    ings:(r.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),
+    steps:r.steps||[]
+  };
+  cbRecipe=temp;cbServings=temp.baseServings;cbTab='recipe';cbCheckedIngs=new Set();
+  const ov=document.getElementById('cookbook-overlay');
+  ov.style.display='flex';
+  const primaryCat=cats[0]||'dinner';
+  const photo=`<div class="cb-cover-placeholder" style="background:${catPlateColors[primaryCat]};display:flex;align-items:center;justify-content:center;font-size:80px">${r.emoji||catEmoji[primaryCat]||'🍽️'}</div>`;
+  ov.innerHTML=`<div class="cookbook-topbar">
+    <div class="back-link" onclick="closePreviewCookbook()"><i class="ti ti-arrow-left"></i> Back to Discover</div>
+    <div style="font-size:11px;color:var(--ink4);font-style:italic;flex:1;margin-left:8px">Preview — not saved yet</div>
+    <div class="cookbook-actions">
+      <button class="btn-ghost" onclick="closePreviewCookbook()">Keep looking</button>
+      <button class="made-this-btn" style="background:var(--accent)" onclick="saveFromDiscoverPreview()"><i class="ti ti-bookmark"></i> Save to library</button>
+    </div>
+  </div>
+  <div class="cookbook-scroll"><div class="cookbook-page">
+    <div class="cb-header">
+      <div class="cb-cover-photo">${photo}</div>
+      <div class="cb-title-block">
+        <div class="cb-title">${temp.name}</div>
+        <div class="cb-meta-row">${temp.cats.map(c=>`<span class="cat-pill ${catPills[c]||'cpd'}">${c}</span>`).join('')}<span class="cb-meta-item"><i class="ti ti-clock" style="font-size:13px"></i> ${temp.time}</span><span class="cb-meta-item">Serves ${temp.baseServings}</span></div>
+        <div class="cb-tags-row">${temp.tags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
+      </div>
+    </div>
+    <div id="cb-recipe-body"></div>
+  </div></div>`;
+  renderCbRecipeBody();
+}
+
+async function saveFromDiscoverPreview(){
+  if(!pendingExtractedRecipe)return;
+  closePreviewCookbook();
+  await saveDiscoveredRecipe(null,pendingExtractedRecipe);
+}
+
+async function saveDiscoveredRecipe(btn,rawOverride){
+  const raw=rawOverride||(btn?JSON.parse(btn.closest('.discover-recipe-card').dataset.recipe):null);
+  if(!raw)return;
+  const cats=raw.categories&&raw.categories.length?raw.categories:[raw.category||'dinner'];
+  const emoji=raw.emoji||catEmoji[cats[0]]||'🍽️';
+  const row={
+    name:raw.name, cats, emoji, src:'manual',
+    time:raw.time||'30 min', base_servings:raw.baseServings||2,
+    time_made:0, rating:0, notes:'', tags:raw.tags||[],
+    family_profiles:[], edits:[], photo_url:'',
+    source_label:'Discovered via Rish', source_url:'',
+    ings:(raw.ingredients||[]).map(i=>({amt:i.amt,unit:i.unit||null,qty:i.qty||null,name:i.name})),
+    steps:raw.steps||[], is_public:false
+  };
+  // Remove card immediately
+  if(btn){
+    const card=btn.closest('.discover-recipe-card');
+    card.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--ink4)"><i class="ti ti-loader spinner"></i> Saving…</div>`;
+  }
+  try{
+    const saved=await dbPost('/api/recipes',row);
+    if(!saved||!saved.id)throw new Error('No ID from server');
+    const newRecipe=rowToRecipe(saved);
+    newRecipe.photoUrl='emoji:'+emoji;
+    recipes.unshift(newRecipe);
+    filterRecipes();updateCounts();
+    if(btn){
+      const card=btn.closest('.discover-recipe-card');
+      if(card)card.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--success);display:flex;align-items:center;gap:6px"><i class="ti ti-check"></i> Saved to your library!</div>`;
+      setTimeout(()=>{const c=btn.closest&&btn.closest('.discover-recipe-card');if(c)c.remove();},2000);
+    }
+    showToast(`${raw.name} saved!`);
+    fetchRecipePhoto(saved.id,saved.name,newRecipe.cats,emoji);
+    estimateMacros(saved.id);
+    pendingExtractedRecipe=null;
+  }catch(e){
+    console.error('Save discovered failed:',e.message);
+    showToast('⚠️ Could not save: '+e.message);
+    if(btn){
+      const card=btn.closest&&btn.closest('.discover-recipe-card');
+      if(card)card.innerHTML=`<div style="padding:12px;font-size:12px;color:var(--danger)">Save failed: ${e.message}</div>`;
+    }
+  }
 }
 let importMode=null,screenshotQueue=[],pendingImageData=null,pendingPdfData=null,importCtx='';
 const EXTRACT_PROMPT=`Extract the recipe from the provided source(s) and return ONLY valid JSON (no markdown):
