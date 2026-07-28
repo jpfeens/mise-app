@@ -737,14 +737,14 @@ async function dbDelete(p){return apiFetch(p,{method:'DELETE'});}
 // Map Supabase snake_case row → camelCase recipe object used in the UI
 function rowToRecipe(row){
   return{
-    id:row.id, name:row.name, cats:row.cats||(row.cat?[row.cat]:['dinner']), src:row.src,
-    time:row.time, baseServings:row.base_servings||2,
+    id:row.id, name:row.name, cats:row.cats||(row.cat?[row.cat]:['dinner']),
+    emoji:row.emoji||'🍽️',
+    src:row.src, time:row.time, baseServings:row.base_servings||2,
     timeMade:row.time_made||0, rating:row.rating||0, notes:row.notes||'',
     tags:row.tags||[], profiles:row.family_profiles||row.profiles||[], edits:row.edits||[],
     photoUrl:row.photo_url||'',
     sourceLabel:row.source_label||'', sourceUrl:row.source_url||'',
-    macros:row.macros||null,
-    is_public:row.is_public||false,
+    macros:row.macros||null, is_public:row.is_public||false,
     ings:row.ings||[], steps:row.steps||[]
   };
 }
@@ -1119,11 +1119,38 @@ function clearChecked(){groceryItems=groceryItems.filter(g=>!g.checked);renderGr
 function renderGroceryList(){const body=document.getElementById('grocery-list-body');if(!body)return;if(!groceryItems.length){body.innerHTML='<div style="font-size:12px;color:var(--ink4);padding:10px 0;text-align:center;font-style:italic">Your list is empty.</div>';return;}const cats=[...new Set(groceryItems.map(g=>g.cat))];body.innerHTML=cats.map(cat=>`<div class="grocery-section"><div class="grocery-category">${cat}</div>${groceryItems.filter(g=>g.cat===cat).map((g)=>{const idx=groceryItems.indexOf(g);return`<div class="grocery-item"><input type="checkbox" id="gi${idx}" ${g.checked?'checked':''} onchange="toggleGrocery(${idx})"><label for="gi${idx}" class="${g.checked?'checked':''}">${g.amt?g.amt+' ':''}<strong>${g.name}</strong></label></div>`;}).join('')}</div>`).join('');}
 function toggleGrocery(idx){groceryItems[idx].checked=!groceryItems[idx].checked;renderGroceryList();}
 let plannerData={},pickerTargetKey=null;
-function renderPlanner(){const grid=document.getElementById('planner-grid');if(!grid)return;grid.innerHTML=DAYS.map(day=>`<div class="planner-day"><div class="planner-day-label">${day}</div>${MEALS.map(meal=>{const key=`${day}-${meal}`;const r=plannerData[key];return r?`<div class="planner-slot filled" onclick="openPlannerPicker('${key}')"><span class="slot-emoji">${r.emoji}</span><span>${r.name}</span><span class="slot-clear" onclick="event.stopPropagation();clearPlannerSlot('${key}')">&times;</span></div>`:`<div class="planner-slot" onclick="openPlannerPicker('${key}')">+</div>`;}).join('')}</div>`).join('');}
-function openPlannerPicker(key){pickerTargetKey=key;const ov=document.createElement('div');ov.className='picker-overlay';ov.id='picker-overlay';ov.onclick=(e)=>{if(e.target===ov)ov.remove();};ov.innerHTML=`<div class="picker-modal"><div class="picker-header"><i class="ti ti-search" style="color:var(--ink4)"></i><input type="text" placeholder="Search recipes&hellip;" oninput="filterPickerList(this.value)" autofocus></div><div class="picker-list" id="picker-list"></div></div>`;document.getElementById('app').appendChild(ov);renderPickerList(recipes);}
-function renderPickerList(list){const pl=document.getElementById('picker-list');if(!pl)return;if(!list.length){pl.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">No matches.</div>';return;}pl.innerHTML=list.map(r=>`<div class="picker-item" onclick="choosePlannerRecipe(${r.id})"><span class="picker-item-name">${r.name}</span><span class="picker-item-cat">${r.cats.join(', ')}</span></div>`).join('');}
+function renderPlanner(){
+  const grid=document.getElementById('planner-grid');if(!grid)return;
+  grid.innerHTML=DAYS.map(day=>`<div class="planner-day"><div class="planner-day-label">${day}</div>${MEALS.map(meal=>{
+    const key=day+'-'+meal;const r=plannerData[key];
+    const em=r?(r.emoji||catEmoji[(r.cats&&r.cats[0])||'dinner']||'\u{1F37D}\uFE0F'):'';
+    return r
+      ?'<div class="planner-slot filled" onclick="openPlannerPicker(\''+key+'\')"><span class="slot-emoji">'+em+'</span><span>'+r.name+'</span><span class="slot-clear" onclick="event.stopPropagation();clearPlannerSlot(\''+key+'\')">\xD7</span></div>'
+      :'<div class="planner-slot" onclick="openPlannerPicker(\''+key+'\')">+</div>';
+  }).join('')}</div>`).join('');
+}
+function openPlannerPicker(key){
+  pickerTargetKey=key;
+  const existing=document.getElementById('picker-overlay');if(existing)existing.remove();
+  const ov=document.createElement('div');ov.className='picker-overlay';ov.id='picker-overlay';
+  ov.onclick=(e)=>{if(e.target===ov)ov.remove();};
+  ov.innerHTML='<div class="picker-modal"><div class="picker-header"><i class="ti ti-search" style="color:var(--ink4)"></i><input type="text" placeholder="Search recipes\u2026" oninput="filterPickerList(this.value)" autofocus></div><div class="picker-list" id="picker-list"></div></div>';
+  document.getElementById('app').appendChild(ov);
+  renderPickerList(recipes);
+}
+function renderPickerList(list){
+  const pl=document.getElementById('picker-list');if(!pl)return;
+  if(!list.length){pl.innerHTML='<div style="padding:20px;text-align:center;color:var(--ink4);font-size:12px">No recipes yet \u2014 import some first!</div>';return;}
+  pl.innerHTML=list.map(r=>'<div class="picker-item" onclick="choosePlannerRecipe(\''+r.id+'\')"><span class="picker-item-name">'+r.name+'</span><span class="picker-item-cat">'+(r.cats||[]).join(', ')+'</span></div>').join('');
+}
 function filterPickerList(q){renderPickerList(recipes.filter(r=>r.name.toLowerCase().includes(q.toLowerCase())));}
-function choosePlannerRecipe(id){const r=recipes.find(x=>x.id===id);if(!r||!pickerTargetKey)return;plannerData[pickerTargetKey]=r;document.getElementById('picker-overlay').remove();renderPlanner();showToast(`Added ${r.name}`);}
+function choosePlannerRecipe(id){
+  const r=recipes.find(x=>String(x.id)===String(id));
+  if(!r||!pickerTargetKey)return;
+  plannerData[pickerTargetKey]=r;
+  const ov=document.getElementById('picker-overlay');if(ov)ov.remove();
+  renderPlanner();showToast('Added '+r.name);
+}
 function clearPlannerSlot(key){delete plannerData[key];renderPlanner();}
 async function generateMealPlan(){await new Promise(r=>setTimeout(r,300));DAYS.forEach(day=>{const bs=recipes.filter(r=>r.cats.includes('breakfast')),ls=recipes.filter(r=>r.cats.includes('lunch')),ds=recipes.filter(r=>r.cats.includes('dinner'));if(bs.length)plannerData[`${day}-Breakfast`]=bs[Math.floor(Math.random()*bs.length)];if(ls.length)plannerData[`${day}-Lunch`]=ls[Math.floor(Math.random()*ls.length)];if(ds.length)plannerData[`${day}-Dinner`]=ds[Math.floor(Math.random()*ds.length)];});renderPlanner();showToast('Plan generated \u2014 click any slot to change it');}
 function addPlannerToGrocery(){Object.values(plannerData).forEach(r=>{if(!r)return;r.ings.forEach(ing=>{if(!groceryItems.find(g=>g.name.toLowerCase()===ing.name.toLowerCase()))groceryItems.push({name:ing.name,amt:ing.amt||'',cat:r.cats[0],checked:false});});});renderGroceryList();showPanelTab('grocery');showToast('All meals added to grocery list!');}
