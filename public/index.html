@@ -1003,7 +1003,13 @@ async function sendDiscoverM(prefill){
   discoverLoading=false;chat.scrollTop=chat.scrollHeight;
 }
 let cbRecipe=null,cbServings=2,cbTab='recipe',cbEditDraft=null,cbCheckedIngs=new Set();
-function openCookbook(id,startInEdit){cbRecipe=recipes.find(r=>String(r.id)===String(id));cbServings=cbRecipe.baseServings;cbTab=startInEdit?'edit':'recipe';cbCheckedIngs=new Set();renderCookbook();document.getElementById('cookbook-overlay').style.display='flex';}
+function openCookbook(id,startInEdit){
+  const found=recipes.find(r=>String(r.id)===String(id));
+  if(!found){console.error('openCookbook: recipe not found',id);showToast('Could not open recipe');return;}
+  cbRecipe=found;cbServings=cbRecipe.baseServings;cbTab=startInEdit?'edit':'recipe';cbCheckedIngs=new Set();
+  renderCookbook();
+  document.getElementById('cookbook-overlay').style.display='flex';
+}
 function closeCookbook(){document.getElementById('cookbook-overlay').style.display='none';cbRecipe=null;cbEditDraft=null;}
 function switchCbTab(tab){if(tab==='edit')beginCbEdit();cbTab=tab;document.querySelectorAll('.cb-tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));renderCbTabBody();}
 function renderCookbook(){
@@ -1230,7 +1236,7 @@ function setImportMode(mode,ctx){
   }else if(mode==='photo'){
     area.innerHTML=`<div class="section-lbl">Upload a photo of the dish</div><div class="drop-zone" id="drop-z" onclick="document.getElementById('file-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handleImgDrop(event)"><i class="ti ti-camera" style="font-size:20px;color:var(--ink4);display:block;margin-bottom:6px"></i><div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop image or click to browse</div><div style="font-size:11px;color:var(--ink4)">JPG, PNG, HEIC</div></div><input type="file" id="file-inp" accept="image/*" style="display:none" onchange="handleFileSelect(this)"><div id="img-preview" style="display:none"></div><button class="btn-primary" id="parse-img-btn" style="display:none;width:100%" onclick="parseImage()">Extract recipe &rarr;</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
   }else if(mode==='pdf'){
-    area.innerHTML=`<div class="section-lbl">Upload a PDF</div><div class="drop-zone" id="pdf-drop-z" onclick="document.getElementById('pdf-file-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handlePdfDrop(event)"><i class="ti ti-file-type-pdf" style="font-size:22px;color:var(--ink4);display:block;margin-bottom:6px"></i><div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop PDF or click to browse</div><div style="font-size:11px;color:var(--ink4)">Recipe book pages, printed recipes</div></div><input type="file" id="pdf-file-inp" accept="application/pdf" style="display:none" onchange="handlePdfSelect(this)"><div id="pdf-preview" style="display:none;font-size:12px;color:var(--ink3);padding:8px 0;display:flex;align-items:center;gap:8px"></div><button class="btn-primary" id="parse-pdf-btn" style="display:none;width:100%" onclick="parsePdf()"><i class="ti ti-sparkles"></i> Extract recipe &rarr;</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">&larr; Back</button>`;
+    area.innerHTML=`<div class="section-lbl">Upload a PDF</div><div class="drop-zone" id="pdf-drop-z" onclick="document.getElementById('pdf-file-inp').click()" ondragover="event.preventDefault();this.classList.add('drag-over')" ondragleave="this.classList.remove('drag-over')" ondrop="handlePdfDrop(event)"><i class="ti ti-file-type-pdf" style="font-size:22px;color:var(--ink4);display:block;margin-bottom:6px"></i><div style="font-size:12px;font-weight:500;margin-bottom:2px">Drop PDF or click to browse</div><div style="font-size:11px;color:var(--ink4)">Recipe book pages, printed recipes</div></div><input type="file" id="pdf-file-inp" accept="application/pdf" style="display:none" onchange="handlePdfSelect(this)"><div id="pdf-preview" style="display:none;font-size:12px;color:var(--ink3);padding:8px 0;align-items:center;gap:8px"></div><button class="btn-primary" id="parse-pdf-btn" style="display:none;width:100%" onclick="parsePdf()"><i class="ti ti-sparkles"></i> Extract recipe →</button><button class="btn-ghost" style="width:100%;text-align:center" onclick="resetImport()">← Back</button>`;
   }else if(mode==='url'){
     area.innerHTML=`<div class="section-lbl">Paste a recipe URL</div><div class="url-row"><input type="text" id="url-inp" placeholder="https://&hellip;"><button class="btn-primary" onclick="parseUrl()">Extract</button></div><div style="font-size:11px;color:var(--ink4)">Any recipe website works.</div><button class="btn-ghost" style="width:100%;text-align:center;margin-top:4px" onclick="resetImport()">&larr; Back</button>`;
   }else{
@@ -1311,27 +1317,31 @@ async function handleExtractResult(text){
   try{
     const r=JSON.parse(text.replace(/```json|```/g,'').trim());
     pendingExtractedRecipe=r;
-    r._photoUrl=''; // no photo on import — user can add one later via Change photo
-
     const cats=r.categories&&r.categories.length?r.categories:[r.category||'dinner'];
     const sfx=importCtx?'-'+importCtx:'';
+    // Hide input area, show result area
+    const ia=document.getElementById('import-input-area'+sfx);if(ia)ia.style.display='none';
     const ra=document.getElementById('import-result-area'+sfx);
+    ra.style.display='flex';ra.style.flexDirection='column';ra.style.gap='9px';
     const sourceHtml=r.sourceLabel?`<div style="font-size:11px;color:var(--ink4);font-style:italic;margin-top:4px">Source: ${r.sourceLabel}</div>`:'';
-    ra.innerHTML=`<div class="section-lbl">Extracted &mdash; looks right?</div>
+    ra.innerHTML=`<div class="section-lbl">Extracted — looks right?</div>
     <div class="result-card">
       <div class="rc-body2" style="padding:12px">
         <div style="font-family:'Lora',serif;font-size:14px;font-weight:500;margin-bottom:5px">${r.name}</div>
-        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">${cats.map(c=>`<span class="cat-pill ${catPills[c]||'cpd'}">${c}</span>`).join('')}<span style="font-size:11px;color:var(--ink4);align-self:center;margin-left:2px">${r.time} &middot; ${r.baseServings||2} servings</span></div>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:4px">${cats.map(c=>`<span class="cat-pill ${catPills[c]||'cpd'}">${c}</span>`).join('')}<span style="font-size:11px;color:var(--ink4);align-self:center;margin-left:2px">${r.time||''} · ${r.baseServings||2} servings</span></div>
         <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:4px">${(r.tags||[]).map(t=>`<span class="tag">#${t}</span>`).join('')}</div>
         ${sourceHtml}
         <div style="display:flex;gap:6px;margin-top:12px">
           <button class="btn-ghost" style="flex:1;justify-content:center" onclick="previewExtractedRecipe()"><i class="ti ti-eye"></i> Preview</button>
-          <button class="btn-primary" style="flex:1;justify-content:center" onclick="saveExtracted(pendingExtractedRecipe)"><i class="ti ti-check"></i> Save</button>
-          <button class="btn-ghost" onclick="resetImport()">&times;</button>
+          <button class="btn-primary" style="flex:1;justify-content:center" onclick="saveExtracted(pendingExtractedRecipe)"><i class="ti ti-check"></i> Save to library</button>
+          <button class="btn-ghost" onclick="resetImport()">← Back</button>
         </div>
       </div>
     </div>`;
-  }catch(e){showImportError('Could not parse a recipe. Try a clearer image or paste the text.');}
+  }catch(e){
+    console.error('Parse error:',e,text?.slice(0,200));
+    showImportError('Could not parse a recipe from this. Try a clearer image or paste the text directly.');
+  }
 }
 
 // Opens a temporary cookbook overlay for a not-yet-saved recipe
@@ -1483,10 +1493,11 @@ async function estimateMacros(recipeId){
   }catch(e){/* silently ignore */}
 }
 function resetImport(){
+  const sfx=importCtx?'-'+importCtx:'';
   importMode=null;screenshotQueue=[];pendingImageData=null;pendingPdfData=null;pendingSourceImageData=null;
-  const ms=document.getElementById('import-mode-select'+sfx);if(ms)ms.style.display='block';
+  const ms=document.getElementById('import-mode-select'+sfx);if(ms)ms.style.display='flex';
   const ia=document.getElementById('import-input-area'+sfx);if(ia)ia.style.display='none';
-  const ra=document.getElementById('import-result-area'+sfx);if(ra)ra.style.display='none';
+  const ra=document.getElementById('import-result-area'+sfx);if(ra){ra.style.display='none';ra.innerHTML='';}
   importCtx='';
 }
 function openImport(){navTo('import');}
